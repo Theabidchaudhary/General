@@ -4,6 +4,7 @@ import { expandTemplate, extractVariables, MissingVariableError } from '@/prompt
 import { MAX_BATCH_SIZE } from '@/queue/batch';
 import { pickDefaultProvider } from '../providerSelection';
 import { useAppStore } from '../store';
+import { useEscapeToClose } from '../useEscapeToClose';
 
 interface FormState {
   id: string | undefined;
@@ -237,6 +238,7 @@ function UseTemplateDialog({
     Object.fromEntries(template.variables.map((name) => [name, ''])),
   );
   const [error, setError] = useState<string | undefined>(undefined);
+  useEscapeToClose(onClose);
 
   function submit() {
     try {
@@ -322,6 +324,7 @@ function BatchDialog({
   );
   const [submitting, setSubmitting] = useState(false);
   const [outcome, setOutcome] = useState<string | undefined>(undefined);
+  useEscapeToClose(onClose);
 
   const matrix = Object.fromEntries(
     template.variables.map((name) => [name, parseOptions(optionsText[name] ?? '')]),

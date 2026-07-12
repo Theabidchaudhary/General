@@ -130,7 +130,7 @@ Every development task follows the same definition of done:
 | 14 | Notifications: job completion/failure notices | ✅ |
 | 15 | Import/export: templates, settings, history | ✅ |
 | 16 | Real provider integrations (behind the adapter interface) | ⬜ |
-| 17 | Keyboard shortcuts + accessibility pass | ⬜ |
-| 18 | Polish: empty states, error surfaces, responsiveness | ⬜ |
-| 19 | Packaging: store-ready build, icons, versioning | ⬜ |
+| 17 | Keyboard shortcuts + accessibility pass | ✅ |
+| 18 | Polish: empty states, error surfaces, responsiveness | ✅ |
+| 19 | Packaging: store-ready build, icons, versioning | ✅ |
 | 20 | End-to-end testing + documentation completion | ⬜ |

@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Keyboard shortcuts, packaging, polish
+
+### Added
+
+- Keyboard shortcuts: `Alt+1`..`Alt+7` switches views (discoverable via nav button tooltips); `Escape` closes the Prompt Library's dialogs.
+- Real generated icon set (16/32/48/128 PNG) via `scripts/generate-icons.mjs`, wired into `manifest.json` and used by notifications (replacing the earlier inline placeholder icon).
+- Verified narrow-width (340px, real side-panel scale) layout across all seven views: no horizontal overflow, truncation reads cleanly, stat grids reflow correctly.
+
 ## Unreleased — Real-extension verification
 
 ### Fixed

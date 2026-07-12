@@ -20,6 +20,12 @@ Status of each module against [SPECIFICATION.md](SPECIFICATION.md), plus the dec
 | Settings module | ✅ Implemented | `SettingsService` over `chrome.storage.sync`; theme, concurrency, retries, auto-download, subfolder, notifications, telemetry toggle, default provider — all wired live into the subsystems that consume them |
 | Notifications | ✅ Implemented | `NotificationManager` over a `NotificationDriver` abstraction (chrome.notifications / recording mock); fires once per job on completion or failure, gated by Settings |
 | Import/export | ✅ Implemented | `ImportExportService` bundles templates/settings/history as versioned JSON; download/file-picker UI in Settings |
+| Real provider integrations | ⬜ Not started | Deliberately deferred — see note below |
+| Keyboard shortcuts + accessibility | ✅ Implemented | Alt+1..7 view switching, Escape closes dialogs; verified with the real built extension |
+| Polish | ✅ Implemented | Empty states, error surfaces, and narrow-width (340px, real side-panel scale) layout all verified with no horizontal overflow |
+| Packaging | ✅ Implemented | Real generated icon set (16/32/48/128), wired into `manifest.json` and used by notifications; version scheme in place |
+
+**On real provider integrations:** the architecture is ready for one — `ProviderAdapter` is a clean interface, `ProviderRegistry` is the only place a concrete provider gets referenced, and nothing in the queue/UI assumes a specific service. What's deliberately not been done is wiring up an actual paid API (OpenAI Images, Stability AI, Replicate, etc.): that requires a user-supplied API key and would be genuinely untestable in this environment (no credentials, and unverified network egress to third-party hosts) — building it without being able to verify it works would mean shipping unverified code, which this project has specifically tried to avoid at every other step (see the real-extension E2E verification below). This is flagged as a known gap, not silently skipped.
 
 ## Key decisions
 
@@ -91,7 +97,7 @@ Status of each module against [SPECIFICATION.md](SPECIFICATION.md), plus the dec
 
 - Same driver-abstraction pattern as Downloads: `NotificationManager` depends only on a `NotificationDriver` interface (`notify()`), never `chrome.notifications` directly — `ChromeNotificationDriver` wraps the real API, `MockNotificationDriver` records calls for tests.
 - Fires once per job, on the *first* `completed` or `failed` transition only — deliberately excludes `downloaded` from the notify set, since that's a follow-up action on a job the user was already told about, not a new event. An in-memory `#notified` set (per job id) guards against a duplicate `job-updated` emission re-firing the same notification.
-- `ChromeNotificationDriver` inlines a minimal 1×1 transparent PNG as a `data:` URI for `iconUrl` rather than pointing at an extension-relative icon file — `chrome.notifications.create` needs a syntactically valid raster image, and this avoids depending on icon assets before the Packaging milestone adds real branded ones. Swap this for a real icon path once those assets exist.
+- `ChromeNotificationDriver` uses `chrome.runtime.getURL('icons/icon-128.png')` for `iconUrl`, pointing at the real generated icon set (see Packaging below).
 - Gated by `Settings.notificationsEnabled` (`true` by default) via `setEnabled()`, wired the same way as `DownloadManager.setAutoDownload()`: applied once on settings restore and again on every `settings-changed` event.
 
 ### Import/export (`src/importExport/`)
@@ -111,7 +117,25 @@ Status of each module against [SPECIFICATION.md](SPECIFICATION.md), plus the dec
 - The side panel (HTML entry) and background worker (ES module) build together; the content script builds separately as a self-contained IIFE because MV3 content scripts cannot be ES modules.
 - `public/manifest.json` registers no static content scripts: provider integrations register `content.js` dynamically via `chrome.scripting` with provider-specific match patterns, keeping host permissions minimal.
 
+### Keyboard shortcuts + accessibility (`src/app/useKeyboardShortcuts.ts`, `src/app/useEscapeToClose.ts`)
+
+- `Alt+1`..`Alt+7` switches views, matching the nav's visible order (`VIEWS` in `store.ts` is the single source of truth both the nav buttons and the shortcut handler read from, so they can't drift apart). Ignored when any other modifier is held. Nav buttons carry a `title` tooltip (`"Jobs (Alt+2)"` etc.) so the shortcuts are discoverable, not just documented.
+- `Escape` closes the Prompt Library's `UseTemplateDialog`/`BatchDialog` via a small shared `useEscapeToClose(onClose)` hook rather than duplicating a keydown listener in each.
+- Everything else leans on native semantics rather than custom widgets: real `<button>`/`<input>`/`<select>`/`<label>` elements throughout (all natively keyboard- and screen-reader-accessible), `aria-current="page"` on the active nav item, `role="alert"` on error text, `role="dialog"` + `aria-label` on the two dialogs.
+
+### Packaging (`public/icons/`, `scripts/generate-icons.mjs`)
+
+- Icons are real generated assets (16/32/48/128 PNG), not placeholders — `scripts/generate-icons.mjs` renders a simple branded glyph in headless Chromium and screenshots it at each size; rerun it by hand (`node scripts/generate-icons.mjs`) after changing the design. Referenced from both `manifest.json` (`icons`, `action.default_icon`) and `ChromeNotificationDriver`.
+- Version is tracked in both `package.json` and `manifest.json` (kept in sync manually — there's no build step that derives one from the other); `CHANGELOG.md` follows Keep-a-Changelog-style "Unreleased" sections per milestone, ready to collapse into a version heading at release time.
+
+## Real-extension verification
+
+Alongside the unit test suite (Vitest, `MemoryJobStore`/mock drivers), the actual **built** extension has been loaded as a real unpacked MV3 extension in real Chromium (Playwright's `launchPersistentContext` with `--load-extension`, headless mode — Chrome's "new" headless mode supports extensions since Chrome 109) and driven through the golden path: enqueue → job completes → download completes → job transitions to `downloaded` → History and Analytics reflect it → template creation → keyboard shortcuts — all against the *real* background service worker, `chrome.storage`, and `chrome.downloads`, with zero console errors.
+
+This caught a real bug unit tests structurally could not: `MockProvider`'s download URL was a placeholder hostname (`https://mock.invalid/...`) that no test ever actually fetched (every test either exercises the queue/download *logic* against a mock driver, or mocks `chrome.runtime.sendMessage` entirely) — but real Chrome's `chrome.downloads.download()` genuinely tries to fetch it, and always failed. Fixed by switching to a `data:` URI. The lesson generalizes: **when a driver/adapter's own output feeds back into a real browser API the mocks never touch, only loading the real extension exercises that seam.** Worth re-running this style of check after any change to `resolveDownloads()`, `DownloadDriver`, or similar boundary code.
+
 ## Testing conventions
 
 - Tests are colocated (`*.test.ts`) and run in a Node environment; `chrome.*` is stubbed per-test (see `bus.test.ts`).
 - Queue tests run against `MemoryJobStore` + `MockProvider` with millisecond backoff/poll intervals; they assert on the event stream (`job-updated`) rather than sleeping.
+- See "Real-extension verification" above for the complementary, higher-fidelity check that exercises the actual built extension rather than mocks.

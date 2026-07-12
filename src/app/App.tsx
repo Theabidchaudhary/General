@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useAppStore, VIEWS } from './store';
+import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { useTheme } from './useTheme';
 import { AnalyticsView } from './views/AnalyticsView';
 import { DashboardView } from './views/DashboardView';
@@ -19,6 +20,7 @@ export function App() {
   const theme = useAppStore((s) => s.settings.theme);
 
   useTheme(theme);
+  useKeyboardShortcuts(setActiveView);
 
   useEffect(() => {
     void refresh();
@@ -44,11 +46,12 @@ export function App() {
 
       <nav aria-label="Primary" className="border-b border-neutral-200 dark:border-neutral-800">
         <ul className="flex flex-wrap gap-1 px-2 py-1.5">
-          {VIEWS.map((view) => (
+          {VIEWS.map((view, index) => (
             <li key={view.id}>
               <button
                 type="button"
                 aria-current={activeView === view.id ? 'page' : undefined}
+                title={`${view.label} (Alt+${index + 1})`}
                 onClick={() => setActiveView(view.id)}
                 className={
                   activeView === view.id
