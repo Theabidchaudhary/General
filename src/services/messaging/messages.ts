@@ -7,6 +7,7 @@
 import type { Job, JobRequest, PromptTemplate, QueueItem } from '@/types/models';
 import type { ProviderDescriptor } from '@/providers/types';
 import type { SaveTemplateInput } from '@/prompts/library';
+import type { BatchInput, BatchResult } from '@/queue/batch';
 import type { LogEntry } from '@/utils/logger';
 
 export interface MessageMap {
@@ -61,6 +62,10 @@ export interface MessageMap {
   'prompts/delete': {
     request: { id: string };
     response: { deleted: true };
+  };
+  'batch/submit': {
+    request: { input: BatchInput };
+    response: BatchResult;
   };
   'logs/recent': {
     request: { limit?: number };

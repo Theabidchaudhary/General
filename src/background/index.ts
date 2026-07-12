@@ -8,6 +8,7 @@
 import { PromptLibrary } from '@/prompts/library';
 import { MockProvider } from '@/providers/mock/mockProvider';
 import { ProviderRegistry } from '@/providers/registry';
+import { BatchEngine } from '@/queue/batch';
 import { QueueEngine } from '@/queue/engine';
 import { createMessageRouter } from '@/services/messaging/bus';
 import { IndexedDbJobStore } from '@/services/storage/indexedDbJobStore';
@@ -29,6 +30,7 @@ const queue = new QueueEngine({
 });
 
 const library = new PromptLibrary(new IndexedDbTemplateStore());
+const batchEngine = new BatchEngine(queue);
 
 const ready = queue.restore().catch((error) => {
   log.error('Failed to restore queue from storage', error);
@@ -69,6 +71,10 @@ createMessageRouter({
   'prompts/delete': async ({ id }) => {
     await library.delete(id);
     return { deleted: true };
+  },
+  'batch/submit': async ({ input }) => {
+    await ready;
+    return batchEngine.submit(input);
   },
   'logs/recent': async ({ limit }) => ({ entries: getRecentLogs(limit) }),
 });

@@ -42,6 +42,8 @@ export interface JobRequest {
   params: Record<string, string | number | boolean>;
   /** Prompt template this request was expanded from, if any. */
   templateId?: string;
+  /** Batch this request was created by, if any (see src/queue/batch.ts). */
+  batchId?: string;
 }
 
 /** Normalized, serializable error attached to jobs and history records. */

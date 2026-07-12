@@ -12,7 +12,7 @@ Status of each module against [SPECIFICATION.md](SPECIFICATION.md), plus the dec
 | Queue engine | ✅ Implemented | Full state machine, concurrency, priority, retry/backoff, persistence |
 | Message bus | ✅ Implemented | Typed request/response map over `chrome.runtime` |
 | Prompt library / variables | ✅ Implemented | CRUD + `{{variable}}` extraction/expansion, IndexedDB-backed |
-| Batch engine | ⬜ Planned | Milestone 6; `expandMatrix()` (cartesian product) already exists in `src/prompts/variables.ts` for it to consume |
+| Batch engine | ✅ Implemented | Fans a template + variable matrix into N queued jobs via `expandMatrix()`; capped at `MAX_BATCH_SIZE` (50) |
 | Downloads | ⬜ Planned | Milestone 7 (`queue/mark-downloaded` hook already exists) |
 | History | ⬜ Planned | Milestone 8 |
 | Analytics | ⬜ Planned | Milestone 9; local-only |
@@ -43,6 +43,12 @@ Status of each module against [SPECIFICATION.md](SPECIFICATION.md), plus the dec
 - `variables.ts` is pure and dependency-free: `extractVariables()` finds `{{name}}` references (identifier-charset only, no arbitrary template syntax), `expandTemplate()` substitutes them and throws `MissingVariableError` if any are unfilled, and `expandMatrix()` produces the cartesian product of a variable-option matrix — this is what the Batch Engine milestone will call to fan a template into many concrete prompts.
 - `library.ts` (`PromptLibrary`) owns validation (non-empty name/body) and recomputes `variables` from the body on every save, so the stored list is never stale relative to the text.
 - Storage follows the same `*Store` interface pattern as jobs (`TemplateStore` / `MemoryTemplateStore` / `IndexedDbTemplateStore`). Because both job and template stores live in the same IndexedDB database, they now share one connection opened by `src/services/storage/db.ts` — opening the same database name at two different versions from separate modules throws `VersionError`, so any new IndexedDB-backed store must register its object store in `db.ts`, not open its own connection.
+
+### Batch engine (`src/queue/batch.ts`)
+
+- `BatchEngine.submit()` validates the variable matrix up front (every variable must have at least one option; the cartesian-product size is checked against `MAX_BATCH_SIZE` before expansion, not after — a mistyped matrix can't silently materialize thousands of jobs), then calls `expandMatrix()` and enqueues one job per resulting prompt via the injected `QueueEngine`, sequentially so creation order (and therefore FIFO priority tie-breaking) is deterministic.
+- Every job created by a batch carries the same `Job.request.batchId` (added to `JobRequest`) so the UI/history can group them later; `templateId` is also carried through when the batch came from a saved template.
+- Depends only on `QueueEngine`'s public `enqueue()` — it has no persistence or retry logic of its own, and reuses `MissingVariableError`/`expandTemplate` validation rather than duplicating it.
 
 ### Messaging (`src/services/messaging/`)
 

@@ -11,6 +11,7 @@ import { create } from 'zustand';
 import type { Job, JobRequest, PromptTemplate } from '@/types/models';
 import type { ProviderDescriptor } from '@/providers/types';
 import type { SaveTemplateInput } from '@/prompts/library';
+import type { BatchInput, BatchResult } from '@/queue/batch';
 import { MessageBusError, sendMessage } from '@/services/messaging/bus';
 
 export type ViewId =
@@ -51,6 +52,7 @@ interface AppState {
   removeJob(jobId: string): Promise<void>;
   saveTemplate(input: SaveTemplateInput): Promise<PromptTemplate | undefined>;
   deleteTemplate(id: string): Promise<void>;
+  submitBatch(input: BatchInput): Promise<BatchResult | undefined>;
 }
 
 export const useAppStore = create<AppState>((set, get) => {
@@ -140,5 +142,14 @@ export const useAppStore = create<AppState>((set, get) => {
         await sendMessage('prompts/delete', { id });
         await get().refresh();
       }),
+
+    submitBatch: async (input) => {
+      let result: BatchResult | undefined;
+      await guarded(async () => {
+        result = await sendMessage('batch/submit', { input });
+        await get().refresh();
+      });
+      return result;
+    },
   };
 });

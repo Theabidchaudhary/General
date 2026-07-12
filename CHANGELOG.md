@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Batch Engine
+
+### Added
+
+- `src/queue/batch.ts`: `BatchEngine` fans a prompt template + variable-option matrix out into one queued job per cartesian-product combination, via the existing `expandMatrix()` helper. Validates up front (no empty-option variables, capped at `MAX_BATCH_SIZE` = 50 jobs) so a mistyped matrix can't silently produce zero or thousands of jobs.
+- `JobRequest.batchId`: jobs created by a batch submission share a `batchId` so they can be grouped later (history/analytics).
+- Message bus: `batch/submit`.
+- Side panel: "Batch" action on templates with variables, opening a dialog to enter comma-separated options per variable with a live job-count preview and over-limit warning.
+- 8 new tests for `BatchEngine` (65 total).
+
 ## Unreleased — Prompt Library
 
 ### Fixed

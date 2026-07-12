@@ -121,7 +121,7 @@ Every development task follows the same definition of done:
 | 5 | Message bus: typed contract between contexts | ✅ |
 | 6 | Prompt library: template CRUD + storage | ✅ |
 | 7 | Prompt variables: `{{variable}}` expansion | ✅ |
-| 8 | Batch engine: fan-out of variable matrices into queued jobs | ⬜ |
+| 8 | Batch engine: fan-out of variable matrices into queued jobs | ✅ |
 | 9 | Download manager: chrome.downloads integration, progress, retry | ⬜ |
 | 10 | History module: archive of finished jobs, search | ⬜ |
 | 11 | Analytics: local snapshots, dashboard charts | ⬜ |

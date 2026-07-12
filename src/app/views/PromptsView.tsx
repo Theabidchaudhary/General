@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { MediaKind, PromptTemplate } from '@/types/models';
 import { expandTemplate, extractVariables, MissingVariableError } from '@/prompts/variables';
+import { MAX_BATCH_SIZE } from '@/queue/batch';
 import { useAppStore } from '../store';
 
 interface FormState {
@@ -24,6 +25,7 @@ export function PromptsView() {
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [useTarget, setUseTarget] = useState<PromptTemplate | undefined>(undefined);
+  const [batchTarget, setBatchTarget] = useState<PromptTemplate | undefined>(undefined);
 
   const liveVariables = extractVariables(form.body);
 
@@ -149,6 +151,16 @@ export function PromptsView() {
                 >
                   Use
                 </button>
+                {template.variables.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setBatchTarget(template)}
+                    className="rounded border border-indigo-300 px-2 py-0.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-50 dark:border-indigo-800 dark:text-indigo-300 dark:hover:bg-indigo-950"
+                    disabled={providers.length === 0}
+                  >
+                    Batch
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() =>
@@ -194,6 +206,14 @@ export function PromptsView() {
             });
             setUseTarget(undefined);
           }}
+        />
+      )}
+
+      {batchTarget && (
+        <BatchDialog
+          template={batchTarget}
+          providerId={providers[0]?.id}
+          onClose={() => setBatchTarget(undefined)}
         />
       )}
     </section>
@@ -268,6 +288,111 @@ function UseTemplateDialog({
           className="rounded border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
         >
           Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function parseOptions(text: string): string[] {
+  return text
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Fans a template out across a variable-option matrix (comma-separated
+ * options per variable) into a batch of queued jobs via BatchEngine.
+ */
+function BatchDialog({
+  template,
+  providerId,
+  onClose,
+}: {
+  template: PromptTemplate;
+  providerId: string | undefined;
+  onClose: () => void;
+}) {
+  const submitBatch = useAppStore((s) => s.submitBatch);
+  const [optionsText, setOptionsText] = useState<Record<string, string>>(
+    Object.fromEntries(template.variables.map((name) => [name, ''])),
+  );
+  const [submitting, setSubmitting] = useState(false);
+  const [outcome, setOutcome] = useState<string | undefined>(undefined);
+
+  const matrix = Object.fromEntries(
+    template.variables.map((name) => [name, parseOptions(optionsText[name] ?? '')]),
+  );
+  const emptyVariables = template.variables.filter((name) => (matrix[name]?.length ?? 0) === 0);
+  const combinationCount = template.variables.reduce(
+    (total, name) => total * (matrix[name]?.length ?? 0),
+    1,
+  );
+  const overLimit = combinationCount > MAX_BATCH_SIZE;
+
+  async function submit() {
+    if (!providerId || emptyVariables.length > 0 || overLimit) return;
+    setSubmitting(true);
+    setOutcome(undefined);
+    const result = await submitBatch({
+      providerId,
+      kind: template.kind,
+      body: template.body,
+      matrix,
+      templateId: template.id,
+    });
+    setSubmitting(false);
+    if (result) setOutcome(`Enqueued ${result.jobs.length} job(s).`);
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-label={`Batch from template ${template.name}`}
+      className="space-y-2 rounded border border-indigo-300 bg-indigo-50 p-3 dark:border-indigo-800 dark:bg-indigo-950"
+    >
+      <p className="text-sm font-medium">Batch from "{template.name}"</p>
+      <p className="text-xs text-neutral-500 dark:text-neutral-400">
+        Enter comma-separated options for each variable; one job is created per combination.
+      </p>
+      {!providerId && (
+        <p className="text-xs text-rose-600 dark:text-rose-400">No provider available.</p>
+      )}
+      {template.variables.map((name) => (
+        <div key={name} className="flex items-center gap-2">
+          <label htmlFor={`batch-var-${name}`} className="w-24 shrink-0 text-xs font-medium">
+            {name}
+          </label>
+          <input
+            id={`batch-var-${name}`}
+            placeholder="option1, option2, ..."
+            value={optionsText[name] ?? ''}
+            onChange={(e) => setOptionsText({ ...optionsText, [name]: e.target.value })}
+            className="flex-1 rounded border border-neutral-300 bg-white px-2 py-1 text-sm dark:border-neutral-700 dark:bg-neutral-900"
+          />
+        </div>
+      ))}
+      <p className="text-xs text-neutral-500 dark:text-neutral-400">
+        {combinationCount} job(s) would be created
+        {overLimit && ` — exceeds the limit of ${MAX_BATCH_SIZE}`}
+      </p>
+      {outcome && <p className="text-xs text-emerald-600 dark:text-emerald-400">{outcome}</p>}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => void submit()}
+          disabled={!providerId || emptyVariables.length > 0 || overLimit || submitting}
+          className="rounded bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+        >
+          {submitting ? 'Enqueuing…' : 'Enqueue batch'}
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded border border-neutral-300 px-3 py-1.5 text-xs hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-800"
+        >
+          Close
         </button>
       </div>
     </div>
