@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased — Documentation completion
+
+### Changed
+
+- README rewritten: full module list, a step-by-step "Try the golden path" walkthrough covering every feature, a Verification section explaining the two-layer testing approach (unit tests + real-extension load), and a Known gaps section (no real provider wired up, and why).
+- All 20 items in the SPECIFICATION.md master build checklist are now complete except real provider integration (deliberately deferred — see README/ARCHITECTURE for why).
+
 ## Unreleased — Keyboard shortcuts, packaging, polish
 
 ### Added

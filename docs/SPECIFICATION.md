@@ -133,4 +133,4 @@ Every development task follows the same definition of done:
 | 17 | Keyboard shortcuts + accessibility pass | ✅ |
 | 18 | Polish: empty states, error surfaces, responsiveness | ✅ |
 | 19 | Packaging: store-ready build, icons, versioning | ✅ |
-| 20 | End-to-end testing + documentation completion | ⬜ |
+| 20 | End-to-end testing + documentation completion | ✅ |
