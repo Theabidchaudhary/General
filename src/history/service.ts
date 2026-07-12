@@ -60,6 +60,14 @@ export class HistoryService {
       .map((record) => structuredClone(record));
   }
 
+  /** Merges externally-sourced records (import/export) by jobId — re-importing the same bundle is idempotent. */
+  async importRecords(records: HistoryRecord[]): Promise<void> {
+    for (const record of records) {
+      this.#records.set(record.jobId, record);
+      await this.#store.save(record);
+    }
+  }
+
   dispose(): void {
     this.#unsubscribe();
   }

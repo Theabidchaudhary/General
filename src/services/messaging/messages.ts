@@ -12,12 +12,14 @@ import type {
   JobRequest,
   PromptTemplate,
   QueueItem,
+  ScheduledJob,
   UserSettings,
 } from '@/types/models';
 import type { ProviderDescriptor } from '@/providers/types';
 import type { SaveTemplateInput } from '@/prompts/library';
 import type { BatchInput, BatchResult } from '@/queue/batch';
 import type { HistoryQuery } from '@/history/service';
+import type { ExportBundle, ImportSummary } from '@/importExport/service';
 import type { LogEntry } from '@/utils/logger';
 
 export interface MessageMap {
@@ -104,6 +106,26 @@ export interface MessageMap {
   'settings/update': {
     request: { patch: Partial<UserSettings> };
     response: { settings: UserSettings };
+  };
+  'scheduler/list': {
+    request: Record<string, never>;
+    response: { jobs: ScheduledJob[] };
+  };
+  'scheduler/create': {
+    request: { request: JobRequest; runAt: number };
+    response: { job: ScheduledJob };
+  };
+  'scheduler/cancel': {
+    request: { id: string };
+    response: { cancelled: boolean };
+  };
+  'io/export': {
+    request: Record<string, never>;
+    response: { bundle: ExportBundle };
+  };
+  'io/import': {
+    request: { bundle: unknown };
+    response: { summary: ImportSummary };
   };
   'logs/recent': {
     request: { limit?: number };

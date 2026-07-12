@@ -7,7 +7,7 @@ Status of each module against [SPECIFICATION.md](SPECIFICATION.md), plus the dec
 | Module | Status | Notes |
 | --- | --- | --- |
 | Foundation (build, config, types) | ✅ Implemented | Vite dual-build (app + IIFE content script), strict TS, Tailwind 4 |
-| UI shell (side panel) | ✅ Implemented | Dashboard, Jobs, Prompts, Downloads live; History/Analytics/Settings still partial or stubbed |
+| UI shell (side panel) | ✅ Implemented | All seven views implemented: Dashboard, Jobs, Prompts, Downloads, History, Analytics, Settings |
 | Provider layer | ✅ Implemented | `ProviderAdapter` interface, registry, error normalization, mock provider |
 | Queue engine | ✅ Implemented | Full state machine, concurrency, priority, retry/backoff, persistence |
 | Message bus | ✅ Implemented | Typed request/response map over `chrome.runtime` |
@@ -16,10 +16,10 @@ Status of each module against [SPECIFICATION.md](SPECIFICATION.md), plus the dec
 | Downloads | ✅ Implemented | `DownloadManager` over a `DownloadDriver` abstraction (chrome.downloads / scriptable mock); progress, retry, auto-download opt-in |
 | History | ✅ Implemented | `HistoryService` archives every job that reaches a terminal state; search by text/provider/state |
 | Analytics | ✅ Implemented | `AnalyticsService` derives a snapshot from History on demand; local-only |
-| Scheduler | ⬜ Planned | Milestone 10; will move retry timers onto `chrome.alarms` |
+| Scheduler | ✅ Implemented | `Scheduler` fires timed jobs; `chrome.alarms` heartbeat (1 min, the platform floor) durably wakes the worker so retry timers and timed jobs survive service-worker teardown |
 | Settings module | ✅ Implemented | `SettingsService` over `chrome.storage.sync`; theme, concurrency, retries, auto-download, subfolder, notifications, telemetry toggle, default provider — all wired live into the subsystems that consume them |
-| Notifications | ⬜ Planned | |
-| Import/export | ⬜ Planned | |
+| Notifications | ✅ Implemented | `NotificationManager` over a `NotificationDriver` abstraction (chrome.notifications / recording mock); fires once per job on completion or failure, gated by Settings |
+| Import/export | ✅ Implemented | `ImportExportService` bundles templates/settings/history as versioned JSON; download/file-picker UI in Settings |
 
 ## Key decisions
 
@@ -71,6 +71,14 @@ Status of each module against [SPECIFICATION.md](SPECIFICATION.md), plus the dec
 - `AnalyticsService.computeSnapshot()` derives an `AnalyticsSnapshot` on demand from History's records (through a minimal `HistorySource` interface, same narrow-dependency pattern as History's `JobEventSource`) — no separate persisted snapshot table; History is already the source of truth for finished-job data, so a fresh computation each time is simpler and can't drift out of sync with it.
 - UI breakdown bars (jobs by provider, jobs by kind) use a single sequential hue sized by magnitude, not a categorical palette — per the dataviz skill, categorical color is for *distinguishing identities*, and here identity is already carried by the row's text label; the count is a *magnitude* comparison, for which "one hue, more is darker/longer" is the correct default. Text (labels, values) always uses neutral text-token colors, never the bar's fill color.
 
+### Scheduler (`src/scheduler/`)
+
+- `Scheduler` covers two related jobs the spec groups together: **timed jobs** (a `ScheduledJob` enqueued into the queue once `runAt` passes) and **durable wake-up** (making sure an MV3 service-worker teardown doesn't strand something).
+- The queue engine's own retry/wait timers already reschedule themselves on every `QueueEngine.restore()` (see the queue engine section above), so `Scheduler` doesn't touch retry logic directly. Its actual contribution to durability is the `chrome.alarms` heartbeat: `chrome.alarms.create('aiwf-heartbeat', { periodInMinutes: 1 })` (1 minute is the platform-enforced floor for alarms) plus an `onAlarm` listener. Firing that alarm revives a torn-down service worker, which re-runs `background/index.ts` top-to-bottom — including `queue.restore()` — so a retry that would otherwise sit stuck (a bare `setTimeout` cannot survive worker teardown; nothing else was guaranteed to wake the worker before its scheduled time) gets picked back up within a minute, and `scheduler.tick()` fires any due timed jobs.
+- `Scheduler` depends on the queue only through a minimal `JobSink` interface (`enqueue()`), the same narrow-dependency pattern used everywhere else in this codebase (`JobEventSource` in History, `JobSource` in Downloads) — it never needs to read job state or subscribe to events, so it doesn't ask for more than that.
+- `tick()` is idempotent and safe to call from multiple triggers (on startup, from the alarm, and could be called on-demand): it only ever acts on jobs still in `'pending'`, and a job that fails to enqueue (e.g. a transient error) is left `'pending'` rather than being marked `'fired'`, so the next tick retries it instead of silently dropping it.
+- No dedicated nav tab — the spec's UX list doesn't call for one, so scheduling is a compact section on the Dashboard (prompt + a `datetime-local` picker + a list of pending entries with per-entry cancel) rather than a seventh view.
+
 ### Settings (`src/settings/`)
 
 - `SettingsService` merges persisted overrides with `DEFAULT_SETTINGS` (so a corrupted/partial stored object never leaves a field `undefined`), clamps `maxConcurrentJobs`/`maxAttempts` to `Math.max(1, Math.floor(value))` — deliberately matching `QueueEngine.setMaxConcurrent`'s own clamping exactly, so a value that round-trips through both never changes — and falls back to `DEFAULT_SETTINGS.theme` for anything outside the three valid theme values.
@@ -78,6 +86,20 @@ Status of each module against [SPECIFICATION.md](SPECIFICATION.md), plus the dec
 - `background/index.ts` applies settings to every consuming subsystem — `queue.setMaxConcurrent()`, `queue.setDefaultMaxAttempts()`, `downloadManager.setAutoDownload()`, `downloadManager.setSubfolder()` — both once on restore and again on every `settings-changed` event, so a change takes effect immediately without a worker restart.
 - Theme: `styles.css` redefines Tailwind's `dark:` variant against `[data-theme="dark"]` instead of the `prefers-color-scheme` media query (`@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));`), and `useTheme()` (`src/app/useTheme.ts`) always writes an explicit `data-theme` onto `<html>` — resolving `'system'` via `matchMedia` and staying subscribed to OS changes only while `'system'` is selected. This is what lets an explicit "dark" choice override the OS preference; without redefining the variant, `dark:` utilities would only ever follow the OS.
 - `defaultProviderId` is honored by `pickDefaultProvider()` (`src/app/providerSelection.ts`), used by both the Dashboard's quick-enqueue and the Prompt Library's Use/Batch dialogs, falling back to the first available provider if the configured default no longer exists.
+
+### Notifications (`src/notifications/`)
+
+- Same driver-abstraction pattern as Downloads: `NotificationManager` depends only on a `NotificationDriver` interface (`notify()`), never `chrome.notifications` directly — `ChromeNotificationDriver` wraps the real API, `MockNotificationDriver` records calls for tests.
+- Fires once per job, on the *first* `completed` or `failed` transition only — deliberately excludes `downloaded` from the notify set, since that's a follow-up action on a job the user was already told about, not a new event. An in-memory `#notified` set (per job id) guards against a duplicate `job-updated` emission re-firing the same notification.
+- `ChromeNotificationDriver` inlines a minimal 1×1 transparent PNG as a `data:` URI for `iconUrl` rather than pointing at an extension-relative icon file — `chrome.notifications.create` needs a syntactically valid raster image, and this avoids depending on icon assets before the Packaging milestone adds real branded ones. Swap this for a real icon path once those assets exist.
+- Gated by `Settings.notificationsEnabled` (`true` by default) via `setEnabled()`, wired the same way as `DownloadManager.setAutoDownload()`: applied once on settings restore and again on every `settings-changed` event.
+
+### Import/export (`src/importExport/`)
+
+- `ImportExportService` bundles templates, settings, and history into one versioned JSON object (`ExportBundle`), depending on each source through a minimal interface (`TemplateSink`/`SettingsSink`/`HistorySink`) rather than the concrete `PromptLibrary`/`SettingsService`/`HistoryService` — the same narrow-dependency pattern used throughout (History's `JobEventSource`, Downloads' `JobSource`, Scheduler's `JobSink`).
+- **Import semantics are asymmetric by design, not oversight:** templates are always created as *new* entries (fresh ids) — a bundle may come from an entirely different browser profile where the old ids are meaningless, so "recreate matching content" is the only interpretation that's safe everywhere. History records, by contrast, merge by `jobId` (via the `HistoryService.importRecords()` addition), because `jobId` is stable and re-importing the same export should be idempotent rather than pile up duplicates. Settings are simply overwritten via the normal `update()` path (validated/clamped the same as any other settings change).
+- Validation (`validateBundle()`) is a deliberately shallow structural check — object shape, version number, array presence — not a full schema validator; it exists to fail loudly on a corrupted or foreign file (`ImportValidationError`, surfaced through the same bus error channel as every other validation error in this codebase), not to police every field.
+- The side panel does the file I/O itself (an anchor-click download for export, a hidden `<input type="file">` for import) rather than the extension using `chrome.downloads` for this — it's a small JSON file the user picks a location for like any other browser download, and doesn't need the queue's download-tracking machinery.
 
 ### Messaging (`src/services/messaging/`)
 

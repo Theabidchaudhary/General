@@ -147,4 +147,24 @@ describe('HistoryService', () => {
     queue.emit(makeJob());
     expect(service.list()).toHaveLength(0);
   });
+
+  it('importRecords persists externally-sourced records and is idempotent by jobId', async () => {
+    const store = new MemoryHistoryStore();
+    const service = new HistoryService(new FakeQueue(), store);
+    const record = {
+      id: 'hist_imported',
+      jobId: 'job_imported',
+      request: { providerId: 'mock', kind: 'image' as const, prompt: 'imported', params: {} },
+      finalState: 'completed' as const,
+      outputs: [],
+      durationMs: 5,
+      finishedAt: Date.now(),
+    };
+    await service.importRecords([record]);
+    expect(service.list()).toHaveLength(1);
+    expect((await store.getAll())).toHaveLength(1);
+
+    await service.importRecords([record]);
+    expect(service.list()).toHaveLength(1);
+  });
 });

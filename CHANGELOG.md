@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased — Notifications
+
+### Added
+
+- `src/notifications/`: `NotificationManager` fires a browser notification once per job on its first completion or failure (not again if a completed job is later downloaded), via a `NotificationDriver` abstraction (`ChromeNotificationDriver` / `MockNotificationDriver`), gated by `Settings.notificationsEnabled`.
+- 7 new tests.
+
+## Unreleased — Import/Export
+
+### Added
+
+- `src/importExport/service.ts`: `ImportExportService` bundles templates, settings, and history into a versioned JSON `ExportBundle`, and restores one back in. Templates import as new entries (fresh ids); history merges by `jobId` via a new `HistoryService.importRecords()`; settings overwrite through the normal validated `update()` path.
+- Message bus: `io/export`, `io/import`.
+- Side panel: "Export data" (downloads a JSON file) / "Import data" (file picker) in Settings.
+- 10 new tests.
+
+## Unreleased — Scheduler
+
+### Added
+
+- `src/scheduler/service.ts`: `Scheduler` fires jobs scheduled for a future time (`ScheduledJob`, new `ScheduledJobStore`) and, via a `chrome.alarms` heartbeat (`aiwf-heartbeat`, 1-minute period — the platform's minimum granularity), durably wakes the MV3 service worker so a torn-down worker doesn't strand a pending retry or timed job indefinitely.
+- Message bus: `scheduler/list`, `scheduler/create`, `scheduler/cancel`.
+- Side panel: a "Schedule for later" section on the Dashboard (prompt + date/time + pending list with cancel) — no new nav tab, since the spec's UX list doesn't call for one.
+- 10 new tests (108 total).
+
 ## Unreleased — Settings
 
 ### Added

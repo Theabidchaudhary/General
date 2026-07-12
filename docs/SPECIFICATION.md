@@ -125,10 +125,10 @@ Every development task follows the same definition of done:
 | 9 | Download manager: chrome.downloads integration, progress, retry | ✅ |
 | 10 | History module: archive of finished jobs, search | ✅ |
 | 11 | Analytics: local snapshots, dashboard charts | ✅ |
-| 12 | Scheduler: chrome.alarms-backed retry/wake-up + timed jobs | ⬜ |
+| 12 | Scheduler: chrome.alarms-backed retry/wake-up + timed jobs | ✅ |
 | 13 | Settings module: chrome.storage.sync, theme, defaults | ✅ |
-| 14 | Notifications: job completion/failure notices | ⬜ |
-| 15 | Import/export: templates, settings, history | ⬜ |
+| 14 | Notifications: job completion/failure notices | ✅ |
+| 15 | Import/export: templates, settings, history | ✅ |
 | 16 | Real provider integrations (behind the adapter interface) | ⬜ |
 | 17 | Keyboard shortcuts + accessibility pass | ⬜ |
 | 18 | Polish: empty states, error surfaces, responsiveness | ⬜ |

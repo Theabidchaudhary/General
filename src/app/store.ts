@@ -15,6 +15,7 @@ import type {
   Job,
   JobRequest,
   PromptTemplate,
+  ScheduledJob,
   UserSettings,
 } from '@/types/models';
 import { DEFAULT_SETTINGS } from '@/types/models';
@@ -56,6 +57,7 @@ interface AppState {
   historyQuery: HistoryQuery;
   analytics: AnalyticsSnapshot | undefined;
   settings: UserSettings;
+  scheduledJobs: ScheduledJob[];
   lastError: string | undefined;
 
   setActiveView(view: ViewId): void;
@@ -72,6 +74,8 @@ interface AppState {
   downloadJob(jobId: string): Promise<void>;
   retryDownload(taskId: string): Promise<void>;
   updateSettings(patch: Partial<UserSettings>): Promise<void>;
+  scheduleJob(request: JobRequest, runAt: number): Promise<ScheduledJob | undefined>;
+  cancelScheduledJob(id: string): Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => {
@@ -101,6 +105,7 @@ export const useAppStore = create<AppState>((set, get) => {
     historyQuery: {},
     analytics: undefined,
     settings: DEFAULT_SETTINGS,
+    scheduledJobs: [],
     lastError: undefined,
 
     setActiveView: (view) => set({ activeView: view }),
@@ -112,16 +117,25 @@ export const useAppStore = create<AppState>((set, get) => {
 
     refresh: () =>
       guarded(async () => {
-        const [queueState, providerState, promptState, downloadState, historyState, analyticsState, settingsState] =
-          await Promise.all([
-            sendMessage('queue/list', {}),
-            sendMessage('providers/list', {}),
-            sendMessage('prompts/list', {}),
-            sendMessage('downloads/list', {}),
-            sendMessage('history/list', { query: get().historyQuery }),
-            sendMessage('analytics/snapshot', {}),
-            sendMessage('settings/get', {}),
-          ]);
+        const [
+          queueState,
+          providerState,
+          promptState,
+          downloadState,
+          historyState,
+          analyticsState,
+          settingsState,
+          schedulerState,
+        ] = await Promise.all([
+          sendMessage('queue/list', {}),
+          sendMessage('providers/list', {}),
+          sendMessage('prompts/list', {}),
+          sendMessage('downloads/list', {}),
+          sendMessage('history/list', { query: get().historyQuery }),
+          sendMessage('analytics/snapshot', {}),
+          sendMessage('settings/get', {}),
+          sendMessage('scheduler/list', {}),
+        ]);
         set({
           jobs: queueState.jobs,
           paused: queueState.paused,
@@ -132,6 +146,7 @@ export const useAppStore = create<AppState>((set, get) => {
           historyRecords: historyState.records,
           analytics: analyticsState.snapshot,
           settings: settingsState.settings,
+          scheduledJobs: schedulerState.jobs,
         });
       }),
 
@@ -206,6 +221,22 @@ export const useAppStore = create<AppState>((set, get) => {
       guarded(async () => {
         const { settings } = await sendMessage('settings/update', { patch });
         set({ settings });
+      }),
+
+    scheduleJob: async (request, runAt) => {
+      let created: ScheduledJob | undefined;
+      await guarded(async () => {
+        const { job } = await sendMessage('scheduler/create', { request, runAt });
+        created = job;
+        await get().refresh();
+      });
+      return created;
+    },
+
+    cancelScheduledJob: (id) =>
+      guarded(async () => {
+        await sendMessage('scheduler/cancel', { id });
+        await get().refresh();
       }),
   };
 });

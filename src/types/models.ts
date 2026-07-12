@@ -135,6 +135,16 @@ export interface DownloadTask {
   updatedAt: number;
 }
 
+/** A job scheduled to be enqueued at a future time. */
+export interface ScheduledJob {
+  id: string;
+  request: JobRequest;
+  /** Epoch ms the job should be enqueued at. */
+  runAt: number;
+  state: 'pending' | 'fired' | 'cancelled';
+  createdAt: number;
+}
+
 /** Immutable record of a finished job kept for the history view. */
 export interface HistoryRecord {
   id: string;

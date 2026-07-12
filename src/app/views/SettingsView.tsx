@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { UserSettings } from '@/types/models';
+import { sendMessage } from '@/services/messaging/bus';
 import { useAppStore } from '../store';
 
 /** Full settings form: theme, queue/download behavior, notifications, and telemetry — persisted via chrome.storage.sync. */
@@ -140,7 +141,98 @@ export function SettingsView() {
         </button>
         {saved && <span className="text-xs text-emerald-600 dark:text-emerald-400">Saved</span>}
       </div>
+
+      <ImportExportSection connected={connected} />
     </section>
+  );
+}
+
+function ImportExportSection({ connected }: { connected: boolean }) {
+  const refresh = useAppStore((s) => s.refresh);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [status, setStatus] = useState<string | undefined>(undefined);
+  const [statusIsError, setStatusIsError] = useState(false);
+
+  async function exportData() {
+    setStatus(undefined);
+    try {
+      const { bundle } = await sendMessage('io/export', {});
+      const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `ai-workflow-studio-export-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setStatus('Exported.');
+      setStatusIsError(false);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+      setStatusIsError(true);
+    }
+  }
+
+  async function importFile(file: File) {
+    setStatus(undefined);
+    try {
+      const text = await file.text();
+      const bundle: unknown = JSON.parse(text);
+      const { summary } = await sendMessage('io/import', { bundle });
+      setStatus(
+        `Imported ${summary.templatesImported} template(s) and ${summary.historyImported} history record(s).`,
+      );
+      setStatusIsError(false);
+      await refresh();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+      setStatusIsError(true);
+    }
+  }
+
+  return (
+    <div className="space-y-2 border-t border-neutral-200 pt-4 dark:border-neutral-800">
+      <h3 className="text-sm font-medium">Import / export</h3>
+      <p className="text-xs text-neutral-500 dark:text-neutral-400">
+        Templates, settings, and history as a single JSON file.
+      </p>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={!connected}
+          onClick={() => void exportData()}
+          className="rounded border border-neutral-300 px-3 py-1.5 text-xs font-medium hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
+        >
+          Export data
+        </button>
+        <button
+          type="button"
+          disabled={!connected}
+          onClick={() => fileInputRef.current?.click()}
+          className="rounded border border-neutral-300 px-3 py-1.5 text-xs font-medium hover:bg-neutral-100 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-800"
+        >
+          Import data
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = '';
+            if (file) void importFile(file);
+          }}
+        />
+      </div>
+      {status && (
+        <p
+          role={statusIsError ? 'alert' : 'status'}
+          className={statusIsError ? 'text-xs text-rose-600 dark:text-rose-400' : 'text-xs text-emerald-600 dark:text-emerald-400'}
+        >
+          {status}
+        </p>
+      )}
+    </div>
   );
 }
 

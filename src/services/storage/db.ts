@@ -6,13 +6,14 @@
  */
 
 export const DB_NAME = 'ai-workflow-studio';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 export const STORE_NAMES = {
   jobs: 'jobs',
   templates: 'templates',
   downloads: 'downloads',
   history: 'history',
+  scheduledJobs: 'scheduledJobs',
 } as const;
 
 let dbPromise: Promise<IDBDatabase> | undefined;
