@@ -5,11 +5,13 @@
  * message router, and opens the side panel from the toolbar action.
  */
 
+import { PromptLibrary } from '@/prompts/library';
 import { MockProvider } from '@/providers/mock/mockProvider';
 import { ProviderRegistry } from '@/providers/registry';
 import { QueueEngine } from '@/queue/engine';
 import { createMessageRouter } from '@/services/messaging/bus';
 import { IndexedDbJobStore } from '@/services/storage/indexedDbJobStore';
+import { IndexedDbTemplateStore } from '@/services/storage/indexedDbTemplateStore';
 import { DEFAULT_SETTINGS } from '@/types/models';
 import { createLogger, getRecentLogs } from '@/utils/logger';
 
@@ -25,6 +27,8 @@ const queue = new QueueEngine({
   maxConcurrent: DEFAULT_SETTINGS.maxConcurrentJobs,
   maxAttempts: DEFAULT_SETTINGS.maxAttempts,
 });
+
+const library = new PromptLibrary(new IndexedDbTemplateStore());
 
 const ready = queue.restore().catch((error) => {
   log.error('Failed to restore queue from storage', error);
@@ -60,6 +64,12 @@ createMessageRouter({
   },
   'queue/mark-downloaded': async ({ jobId }) => ({ marked: await queue.markDownloaded(jobId) }),
   'providers/list': async () => ({ providers: await registry.describeAll() }),
+  'prompts/list': async () => ({ templates: await library.list() }),
+  'prompts/save': async ({ input }) => ({ template: await library.save(input) }),
+  'prompts/delete': async ({ id }) => {
+    await library.delete(id);
+    return { deleted: true };
+  },
   'logs/recent': async ({ limit }) => ({ entries: getRecentLogs(limit) }),
 });
 

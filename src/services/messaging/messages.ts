@@ -4,8 +4,9 @@
  * an entry here; both ends get compile-time checking from the same map.
  */
 
-import type { Job, JobRequest, QueueItem } from '@/types/models';
+import type { Job, JobRequest, PromptTemplate, QueueItem } from '@/types/models';
 import type { ProviderDescriptor } from '@/providers/types';
+import type { SaveTemplateInput } from '@/prompts/library';
 import type { LogEntry } from '@/utils/logger';
 
 export interface MessageMap {
@@ -48,6 +49,18 @@ export interface MessageMap {
   'providers/list': {
     request: Record<string, never>;
     response: { providers: ProviderDescriptor[] };
+  };
+  'prompts/list': {
+    request: Record<string, never>;
+    response: { templates: PromptTemplate[] };
+  };
+  'prompts/save': {
+    request: { input: SaveTemplateInput };
+    response: { template: PromptTemplate };
+  };
+  'prompts/delete': {
+    request: { id: string };
+    response: { deleted: true };
   };
   'logs/recent': {
     request: { limit?: number };

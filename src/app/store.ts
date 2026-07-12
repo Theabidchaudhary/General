@@ -8,8 +8,9 @@
  */
 
 import { create } from 'zustand';
-import type { Job, JobRequest } from '@/types/models';
+import type { Job, JobRequest, PromptTemplate } from '@/types/models';
 import type { ProviderDescriptor } from '@/providers/types';
+import type { SaveTemplateInput } from '@/prompts/library';
 import { MessageBusError, sendMessage } from '@/services/messaging/bus';
 
 export type ViewId =
@@ -38,6 +39,7 @@ interface AppState {
   paused: boolean;
   maxConcurrent: number;
   providers: ProviderDescriptor[];
+  templates: PromptTemplate[];
   lastError: string | undefined;
 
   setActiveView(view: ViewId): void;
@@ -47,6 +49,8 @@ interface AppState {
   resumeQueue(): Promise<void>;
   cancelJob(jobId: string): Promise<void>;
   removeJob(jobId: string): Promise<void>;
+  saveTemplate(input: SaveTemplateInput): Promise<PromptTemplate | undefined>;
+  deleteTemplate(id: string): Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => {
@@ -70,21 +74,24 @@ export const useAppStore = create<AppState>((set, get) => {
     paused: false,
     maxConcurrent: 2,
     providers: [],
+    templates: [],
     lastError: undefined,
 
     setActiveView: (view) => set({ activeView: view }),
 
     refresh: () =>
       guarded(async () => {
-        const [queueState, providerState] = await Promise.all([
+        const [queueState, providerState, promptState] = await Promise.all([
           sendMessage('queue/list', {}),
           sendMessage('providers/list', {}),
+          sendMessage('prompts/list', {}),
         ]);
         set({
           jobs: queueState.jobs,
           paused: queueState.paused,
           maxConcurrent: queueState.maxConcurrent,
           providers: providerState.providers,
+          templates: promptState.templates,
         });
       }),
 
@@ -115,6 +122,22 @@ export const useAppStore = create<AppState>((set, get) => {
     removeJob: (jobId) =>
       guarded(async () => {
         await sendMessage('queue/remove', { jobId });
+        await get().refresh();
+      }),
+
+    saveTemplate: async (input) => {
+      let saved: PromptTemplate | undefined;
+      await guarded(async () => {
+        const { template } = await sendMessage('prompts/save', { input });
+        saved = template;
+        await get().refresh();
+      });
+      return saved;
+    },
+
+    deleteTemplate: (id) =>
+      guarded(async () => {
+        await sendMessage('prompts/delete', { id });
         await get().refresh();
       }),
   };

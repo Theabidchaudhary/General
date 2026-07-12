@@ -3,6 +3,7 @@ import { useAppStore, VIEWS } from './store';
 import { DashboardView } from './views/DashboardView';
 import { JobsView } from './views/JobsView';
 import { PlaceholderView } from './views/PlaceholderView';
+import { PromptsView } from './views/PromptsView';
 import { SettingsView } from './views/SettingsView';
 
 const REFRESH_INTERVAL_MS = 2_000;
@@ -59,13 +60,7 @@ export function App() {
       <main className="flex-1 overflow-y-auto p-4">
         {activeView === 'dashboard' && <DashboardView />}
         {activeView === 'jobs' && <JobsView />}
-        {activeView === 'prompts' && (
-          <PlaceholderView
-            title="Prompt Library"
-            milestone="Milestone 5"
-            description="Reusable prompt templates with {{variable}} expansion and tagging."
-          />
-        )}
+        {activeView === 'prompts' && <PromptsView />}
         {activeView === 'downloads' && (
           <PlaceholderView
             title="Downloads"

@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased — Prompt Library
+
+### Fixed
+
+- **Queue engine: retrying/waiting jobs could be stranded forever.** `#scheduleWakeup`'s timer callback assumed that once it fired, `Date.now() >= job.nextAttemptAt` would hold and called `#pump()` directly. Under real timer/clock granularity (most visible with very short retry delays), the callback can fire at a `Date.now()` reading a millisecond below `nextAttemptAt`; `#pump()`'s eligibility check would then skip the job, and since nothing else ever re-checks it, the job stayed in `retrying`/`waiting` indefinitely. Found via ~50%-flaky queue engine tests, root-caused with an instrumented repro (see `src/queue/engine.ts` `#scheduleWakeup`), and fixed by self-healing: if the job isn't yet eligible when the timer fires, reschedule instead of dropping it. Verified with 30+ consecutive clean test runs after the fix (previously failing at roughly 1-in-2).
+
+
+
+### Added
+
+- `src/prompts/variables.ts`: `{{variable}}` extraction, single-template expansion, and cartesian-product matrix expansion (for the upcoming Batch Engine).
+- `src/prompts/library.ts`: `PromptLibrary` service with create/update/delete/list and validation, backed by a new `TemplateStore` interface (`MemoryTemplateStore` for tests, `IndexedDbTemplateStore` for the extension).
+- Consolidated IndexedDB access behind `src/services/storage/db.ts` — a single shared connection/version so job and template stores can't collide on database version.
+- Message bus: `prompts/list`, `prompts/save`, `prompts/delete`.
+- Side panel: full Prompts view — create/edit/delete templates, live variable detection while typing, and a "Use" flow that fills variables and enqueues a job from the expanded prompt.
+- 16 new tests (variable expansion, prompt library CRUD/validation).
+
 ## 0.1.0 — Foundation
 
 Initial project foundation per the engineering specification.

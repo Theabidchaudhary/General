@@ -11,8 +11,8 @@ Status of each module against [SPECIFICATION.md](SPECIFICATION.md), plus the dec
 | Provider layer | ✅ Implemented | `ProviderAdapter` interface, registry, error normalization, mock provider |
 | Queue engine | ✅ Implemented | Full state machine, concurrency, priority, retry/backoff, persistence |
 | Message bus | ✅ Implemented | Typed request/response map over `chrome.runtime` |
-| Prompt library / variables | ⬜ Planned | Milestone 5 |
-| Batch engine | ⬜ Planned | Milestone 6 |
+| Prompt library / variables | ✅ Implemented | CRUD + `{{variable}}` extraction/expansion, IndexedDB-backed |
+| Batch engine | ⬜ Planned | Milestone 6; `expandMatrix()` (cartesian product) already exists in `src/prompts/variables.ts` for it to consume |
 | Downloads | ⬜ Planned | Milestone 7 (`queue/mark-downloaded` hook already exists) |
 | History | ⬜ Planned | Milestone 8 |
 | Analytics | ⬜ Planned | Milestone 9; local-only |
@@ -30,12 +30,19 @@ Status of each module against [SPECIFICATION.md](SPECIFICATION.md), plus the dec
 - **Persistence:** every transition is written through the `JobStore` interface. The background worker uses `IndexedDbJobStore`; tests use `MemoryJobStore`. On `restore()`, jobs found in `validating`/`running` (interrupted by a worker restart) are reset to `pending`.
 - **Cancellation:** in-flight jobs get an `AbortController`; the runner observes the abort and finalizes the job as `failed`/`CANCELLED`. Provider-side cancel is best-effort.
 - **Timers:** retry wake-ups currently use `setTimeout`. MV3 service workers can be torn down after ~30s idle; the Scheduler milestone replaces these with `chrome.alarms`. `restore()` already reschedules pending wake-ups, so a teardown delays a retry rather than losing it.
+- **Wakeup timer is self-healing:** a `setTimeout` firing is only guaranteed to happen *no earlier* than the requested delay — clock/timer granularity can still leave `Date.now()` reading a millisecond below `job.nextAttemptAt` when the callback runs (most visible at very short delays, e.g. in tests). `#scheduleWakeup`'s callback checks for this and reschedules itself if the job isn't actually eligible yet, rather than calling `#pump()` and silently stranding the job in `retrying`/`waiting` forever (nothing else would ever re-check it). This was a real bug, not just test flakiness — see the CHANGELOG entry.
 
 ### Provider layer (`src/providers/`)
 
 - All provider failures are normalized into `ProviderError` with a closed set of `ErrorCode`s and a per-code default retryability. The queue makes retry decisions from `retryable`/`retryAfterMs` only — never from provider-specific messages.
 - `ProviderRegistry` is the single lookup point. UI receives serializable `ProviderDescriptor`s via the bus; it must never import a concrete adapter.
 - `MockProvider` is a first-class adapter whose behavior is scripted through request params, used by both the test suite and manual QA.
+
+### Prompt library (`src/prompts/`)
+
+- `variables.ts` is pure and dependency-free: `extractVariables()` finds `{{name}}` references (identifier-charset only, no arbitrary template syntax), `expandTemplate()` substitutes them and throws `MissingVariableError` if any are unfilled, and `expandMatrix()` produces the cartesian product of a variable-option matrix — this is what the Batch Engine milestone will call to fan a template into many concrete prompts.
+- `library.ts` (`PromptLibrary`) owns validation (non-empty name/body) and recomputes `variables` from the body on every save, so the stored list is never stale relative to the text.
+- Storage follows the same `*Store` interface pattern as jobs (`TemplateStore` / `MemoryTemplateStore` / `IndexedDbTemplateStore`). Because both job and template stores live in the same IndexedDB database, they now share one connection opened by `src/services/storage/db.ts` — opening the same database name at two different versions from separate modules throws `VersionError`, so any new IndexedDB-backed store must register its object store in `db.ts`, not open its own connection.
 
 ### Messaging (`src/services/messaging/`)
 

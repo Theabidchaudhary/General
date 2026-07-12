@@ -247,11 +247,17 @@ export class QueueEngine {
     if (existing) clearTimeout(existing);
     const timer = setTimeout(() => {
       this.#timers.delete(job.id);
+      // setTimeout guarantees firing no earlier than `delay`, but timer/clock
+      // granularity can still leave Date.now() a hair below nextAttemptAt
+      // when the callback runs. #pump()'s eligibility check would then skip
+      // this job, and since nothing else re-checks it, it would be stranded
+      // in 'retrying'/'waiting' forever. Self-heal by rescheduling instead.
+      if ((job.nextAttemptAt ?? 0) > Date.now()) {
+        this.#scheduleWakeup(job);
+        return;
+      }
       this.#pump();
     }, delay);
-    // Allow Node test processes to exit even with timers scheduled; in the
-    // browser setTimeout returns a number and unref does not exist.
-    (timer as unknown as { unref?: () => void }).unref?.();
     this.#timers.set(job.id, timer);
   }
 
