@@ -28,6 +28,10 @@ interface MockJobState {
   cancelled: boolean;
 }
 
+/** Minimal 1x1 transparent PNG, used as a real fetchable download artifact. */
+const PLACEHOLDER_ARTIFACT_DATA_URI =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+
 export class MockProvider implements ProviderAdapter {
   readonly id = 'mock';
   readonly name = 'Mock Provider';
@@ -113,7 +117,14 @@ export class MockProvider implements ProviderAdapter {
     const extension = kind === 'image' ? 'png' : 'mp4';
     return [
       {
-        url: `https://mock.invalid/artifacts/${submission.remoteId}.${extension}`,
+        // A real, fetchable data: URI (not a placeholder host) so the
+        // download manager's full pipeline — including the actual
+        // chrome.downloads.download() call — genuinely succeeds when
+        // exercised end to end, rather than always failing on a
+        // deliberately unresolvable hostname. The bytes are a 1x1 PNG
+        // regardless of kind; content fidelity doesn't matter here, only
+        // that the download infrastructure has something real to fetch.
+        url: PLACEHOLDER_ARTIFACT_DATA_URI,
         filename: `${submission.remoteId}.${extension}`,
         kind,
       },

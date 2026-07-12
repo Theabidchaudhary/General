@@ -36,7 +36,7 @@ Status of each module against [SPECIFICATION.md](SPECIFICATION.md), plus the dec
 
 - All provider failures are normalized into `ProviderError` with a closed set of `ErrorCode`s and a per-code default retryability. The queue makes retry decisions from `retryable`/`retryAfterMs` only — never from provider-specific messages.
 - `ProviderRegistry` is the single lookup point. UI receives serializable `ProviderDescriptor`s via the bus; it must never import a concrete adapter.
-- `MockProvider` is a first-class adapter whose behavior is scripted through request params, used by both the test suite and manual QA.
+- `MockProvider` is a first-class adapter whose behavior is scripted through request params, used by both the test suite and manual QA. Its `resolveDownloads()` artifact URL is a `data:` URI (a real, always-fetchable 1×1 PNG), not a placeholder hostname — found via loading the actual built extension in real Chromium and running the full create-job → download flow: a `https://mock.invalid/...` URL let every unit test pass (nothing there ever makes a real network call) but made every *real* download fail once `chrome.downloads.download()` genuinely tried to fetch it. Unit tests alone couldn't catch this class of gap; only exercising the real extension did.
 
 ### Prompt library (`src/prompts/`)
 

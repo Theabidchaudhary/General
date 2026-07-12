@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — Real-extension verification
+
+### Fixed
+
+- `MockProvider.resolveDownloads()` returned a placeholder `https://mock.invalid/...` URL. Every unit/mock-driven test passed because nothing in that path ever made a real network call, but loading the actual built extension in real Chromium (via Playwright, `--load-extension`) and running the full create-job → download flow showed every real download failing with `NETWORK_FAILED` — Chrome's real `chrome.downloads.download()` genuinely tries to fetch the URL. Switched to a `data:` URI (a real, always-fetchable 1×1 PNG), so the full pipeline — including the actual downloads API call — now succeeds end to end. Re-verified: job completes, download completes, job transitions to `downloaded`, and History/Analytics reflect it correctly, all against the real unpacked extension with zero console errors.
+
 ## Unreleased — Notifications
 
 ### Added
