@@ -4,7 +4,7 @@
  * an entry here; both ends get compile-time checking from the same map.
  */
 
-import type { Job, JobRequest, PromptTemplate, QueueItem } from '@/types/models';
+import type { DownloadTask, Job, JobRequest, PromptTemplate, QueueItem } from '@/types/models';
 import type { ProviderDescriptor } from '@/providers/types';
 import type { SaveTemplateInput } from '@/prompts/library';
 import type { BatchInput, BatchResult } from '@/queue/batch';
@@ -66,6 +66,18 @@ export interface MessageMap {
   'batch/submit': {
     request: { input: BatchInput };
     response: BatchResult;
+  };
+  'downloads/list': {
+    request: Record<string, never>;
+    response: { tasks: DownloadTask[] };
+  };
+  'downloads/start': {
+    request: { jobId: string };
+    response: { tasks: DownloadTask[] };
+  };
+  'downloads/retry': {
+    request: { taskId: string };
+    response: { task: DownloadTask | undefined };
   };
   'logs/recent': {
     request: { limit?: number };

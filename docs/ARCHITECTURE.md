@@ -7,13 +7,13 @@ Status of each module against [SPECIFICATION.md](SPECIFICATION.md), plus the dec
 | Module | Status | Notes |
 | --- | --- | --- |
 | Foundation (build, config, types) | ✅ Implemented | Vite dual-build (app + IIFE content script), strict TS, Tailwind 4 |
-| UI shell (side panel) | ✅ Implemented | Dashboard + Jobs live; other views stubbed with milestone labels |
+| UI shell (side panel) | ✅ Implemented | Dashboard, Jobs, Prompts, Downloads live; History/Analytics/Settings still partial or stubbed |
 | Provider layer | ✅ Implemented | `ProviderAdapter` interface, registry, error normalization, mock provider |
 | Queue engine | ✅ Implemented | Full state machine, concurrency, priority, retry/backoff, persistence |
 | Message bus | ✅ Implemented | Typed request/response map over `chrome.runtime` |
 | Prompt library / variables | ✅ Implemented | CRUD + `{{variable}}` extraction/expansion, IndexedDB-backed |
 | Batch engine | ✅ Implemented | Fans a template + variable matrix into N queued jobs via `expandMatrix()`; capped at `MAX_BATCH_SIZE` (50) |
-| Downloads | ⬜ Planned | Milestone 7 (`queue/mark-downloaded` hook already exists) |
+| Downloads | ✅ Implemented | `DownloadManager` over a `DownloadDriver` abstraction (chrome.downloads / scriptable mock); progress, retry, auto-download opt-in |
 | History | ⬜ Planned | Milestone 8 |
 | Analytics | ⬜ Planned | Milestone 9; local-only |
 | Scheduler | ⬜ Planned | Milestone 10; will move retry timers onto `chrome.alarms` |
@@ -49,6 +49,16 @@ Status of each module against [SPECIFICATION.md](SPECIFICATION.md), plus the dec
 - `BatchEngine.submit()` validates the variable matrix up front (every variable must have at least one option; the cartesian-product size is checked against `MAX_BATCH_SIZE` before expansion, not after — a mistyped matrix can't silently materialize thousands of jobs), then calls `expandMatrix()` and enqueues one job per resulting prompt via the injected `QueueEngine`, sequentially so creation order (and therefore FIFO priority tie-breaking) is deterministic.
 - Every job created by a batch carries the same `Job.request.batchId` (added to `JobRequest`) so the UI/history can group them later; `templateId` is also carried through when the batch came from a saved template.
 - Depends only on `QueueEngine`'s public `enqueue()` — it has no persistence or retry logic of its own, and reuses `MissingVariableError`/`expandTemplate` validation rather than duplicating it.
+
+### Downloads (`src/downloads/`)
+
+- Mirrors the provider adapter pattern: `DownloadManager` depends only on a `DownloadDriver` interface (`start`/`onEvent`/`cancel`), never on `chrome.downloads` directly. `ChromeDownloadDriver` wraps the real API; `MockDownloadDriver` scripts progress/failure/retry behavior off `DownloadTarget.filename` prefixes (`fail-once:`, `fail-always:`) for tests.
+- `DownloadManager` itself depends on queue engine only through a narrow `JobSource` interface (`events`, `getJob`, `markDownloaded`) rather than the concrete `QueueEngine` class — `QueueEngine` uses true private (`#`) fields, so a duck-typed test double can't structurally satisfy the class type; narrowing to an interface keeps the module testable without the full queue+provider stack and keeps the dependency intentionally minimal.
+- `downloadJob(jobId)` starts one `DownloadTask` per job output not already downloading/downloaded (matched by `target.url`); `retry(taskId)` re-attempts a failed task reusing its id. When every output of a job reaches `'completed'`, the job is transitioned to `'downloaded'` via `queue.markDownloaded()`.
+- **Ordering guarantee:** on a driver `'completed'` event, `#maybeMarkJobDownloaded()` runs *before* the task's own `'task-updated'` event is persisted/emitted — found via a real bug where a test observing the completed task-updated event and then immediately checking the job's state saw it still `'completed'` instead of `'downloaded'`, because the mark-downloaded step was chained via `.then()` *after* persistence (which itself emits synchronously before its promise settles). Listeners of `'task-updated'` can now rely on the job-level side effect having already happened.
+- `MockDownloadDriver` schedules its progress/completion events with `setTimeout(0)`, not `queueMicrotask` — a microtask-scheduled event can fire before the caller's `await driver.start(...)` continuation runs (i.e. before the handle is recorded), silently dropping the event. This is the same class of "assume the caller has caught up" ordering bug as the queue engine's wakeup-timer fix; both mock drivers in this codebase now favor macrotasks for anything a caller must react to after an awaited call resolves.
+- `autoDownload` is off by default (`DEFAULT_SETTINGS.autoDownload`); when enabled it subscribes to the queue's `'job-updated'` event and downloads every job the moment it completes. Manual download is exposed via the Jobs view's "Download" button on completed jobs and the Downloads view's per-task "Retry".
+- Restart recovery: `restore()` marks any `'queued'`/`'in_progress'` task as a retryable failure, since the driver handle correlating it to a live transfer is lost across a service-worker restart (chrome.downloads itself doesn't expose a way to re-attach to an in-flight download by our own task id).
 
 ### Messaging (`src/services/messaging/`)
 

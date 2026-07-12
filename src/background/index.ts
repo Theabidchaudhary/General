@@ -5,12 +5,15 @@
  * message router, and opens the side panel from the toolbar action.
  */
 
+import { ChromeDownloadDriver } from '@/downloads/chromeDriver';
+import { DownloadManager } from '@/downloads/manager';
 import { PromptLibrary } from '@/prompts/library';
 import { MockProvider } from '@/providers/mock/mockProvider';
 import { ProviderRegistry } from '@/providers/registry';
 import { BatchEngine } from '@/queue/batch';
 import { QueueEngine } from '@/queue/engine';
 import { createMessageRouter } from '@/services/messaging/bus';
+import { IndexedDbDownloadStore } from '@/services/storage/indexedDbDownloadStore';
 import { IndexedDbJobStore } from '@/services/storage/indexedDbJobStore';
 import { IndexedDbTemplateStore } from '@/services/storage/indexedDbTemplateStore';
 import { DEFAULT_SETTINGS } from '@/types/models';
@@ -32,8 +35,20 @@ const queue = new QueueEngine({
 const library = new PromptLibrary(new IndexedDbTemplateStore());
 const batchEngine = new BatchEngine(queue);
 
+const downloadManager = new DownloadManager({
+  queue,
+  driver: new ChromeDownloadDriver(),
+  store: new IndexedDbDownloadStore(),
+  logger: log.child('downloads'),
+  subfolder: DEFAULT_SETTINGS.downloadSubfolder,
+  autoDownload: DEFAULT_SETTINGS.autoDownload,
+});
+
 const ready = queue.restore().catch((error) => {
   log.error('Failed to restore queue from storage', error);
+});
+const downloadsReady = downloadManager.restore().catch((error) => {
+  log.error('Failed to restore downloads from storage', error);
 });
 
 createMessageRouter({
@@ -75,6 +90,18 @@ createMessageRouter({
   'batch/submit': async ({ input }) => {
     await ready;
     return batchEngine.submit(input);
+  },
+  'downloads/list': async () => {
+    await downloadsReady;
+    return { tasks: downloadManager.listTasks() };
+  },
+  'downloads/start': async ({ jobId }) => {
+    await Promise.all([ready, downloadsReady]);
+    return { tasks: await downloadManager.downloadJob(jobId) };
+  },
+  'downloads/retry': async ({ taskId }) => {
+    await downloadsReady;
+    return { task: await downloadManager.retry(taskId) };
   },
   'logs/recent': async ({ limit }) => ({ entries: getRecentLogs(limit) }),
 });

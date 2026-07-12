@@ -8,7 +8,7 @@
  */
 
 import { create } from 'zustand';
-import type { Job, JobRequest, PromptTemplate } from '@/types/models';
+import type { DownloadTask, Job, JobRequest, PromptTemplate } from '@/types/models';
 import type { ProviderDescriptor } from '@/providers/types';
 import type { SaveTemplateInput } from '@/prompts/library';
 import type { BatchInput, BatchResult } from '@/queue/batch';
@@ -41,6 +41,7 @@ interface AppState {
   maxConcurrent: number;
   providers: ProviderDescriptor[];
   templates: PromptTemplate[];
+  downloadTasks: DownloadTask[];
   lastError: string | undefined;
 
   setActiveView(view: ViewId): void;
@@ -53,6 +54,8 @@ interface AppState {
   saveTemplate(input: SaveTemplateInput): Promise<PromptTemplate | undefined>;
   deleteTemplate(id: string): Promise<void>;
   submitBatch(input: BatchInput): Promise<BatchResult | undefined>;
+  downloadJob(jobId: string): Promise<void>;
+  retryDownload(taskId: string): Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => {
@@ -77,16 +80,18 @@ export const useAppStore = create<AppState>((set, get) => {
     maxConcurrent: 2,
     providers: [],
     templates: [],
+    downloadTasks: [],
     lastError: undefined,
 
     setActiveView: (view) => set({ activeView: view }),
 
     refresh: () =>
       guarded(async () => {
-        const [queueState, providerState, promptState] = await Promise.all([
+        const [queueState, providerState, promptState, downloadState] = await Promise.all([
           sendMessage('queue/list', {}),
           sendMessage('providers/list', {}),
           sendMessage('prompts/list', {}),
+          sendMessage('downloads/list', {}),
         ]);
         set({
           jobs: queueState.jobs,
@@ -94,6 +99,7 @@ export const useAppStore = create<AppState>((set, get) => {
           maxConcurrent: queueState.maxConcurrent,
           providers: providerState.providers,
           templates: promptState.templates,
+          downloadTasks: downloadState.tasks,
         });
       }),
 
@@ -151,5 +157,17 @@ export const useAppStore = create<AppState>((set, get) => {
       });
       return result;
     },
+
+    downloadJob: (jobId) =>
+      guarded(async () => {
+        await sendMessage('downloads/start', { jobId });
+        await get().refresh();
+      }),
+
+    retryDownload: (taskId) =>
+      guarded(async () => {
+        await sendMessage('downloads/retry', { taskId });
+        await get().refresh();
+      }),
   };
 });

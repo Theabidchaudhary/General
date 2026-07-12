@@ -45,11 +45,13 @@ src/
   app/          Side panel React application (views, zustand store)
   background/   Service worker entry: wires queue + providers + message router
   content/      Content script entry (dynamically registered per provider)
+  downloads/    Download manager: driver abstraction, progress, retry
+  prompts/      Prompt library + {{variable}} expansion
   providers/    Provider abstraction: adapter interface, registry, mock provider
-  queue/        Queue engine: state machine, concurrency, retry, persistence
+  queue/        Queue engine (state machine, concurrency, retry) + batch engine
   services/
     messaging/  Typed message bus over chrome.runtime
-    storage/    JobStore contract + memory / IndexedDB implementations
+    storage/    Job/template/download store contracts + memory / IndexedDB implementations
   types/        Shared data models (Job, PromptTemplate, UserSettings, ...)
   utils/        Logger, backoff, emitter, id generation
 ```

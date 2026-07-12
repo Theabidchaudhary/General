@@ -22,6 +22,7 @@ export function JobsView() {
   const resumeQueue = useAppStore((s) => s.resumeQueue);
   const cancelJob = useAppStore((s) => s.cancelJob);
   const removeJob = useAppStore((s) => s.removeJob);
+  const downloadJob = useAppStore((s) => s.downloadJob);
   const lastError = useAppStore((s) => s.lastError);
 
   return (
@@ -57,6 +58,7 @@ export function JobsView() {
               job={job}
               onCancel={() => void cancelJob(job.id)}
               onRemove={() => void removeJob(job.id)}
+              onDownload={() => void downloadJob(job.id)}
             />
           ))}
         </ul>
@@ -69,10 +71,12 @@ function JobRow({
   job,
   onCancel,
   onRemove,
+  onDownload,
 }: {
   job: Job;
   onCancel: () => void;
   onRemove: () => void;
+  onDownload: () => void;
 }) {
   const isActive = ACTIVE_STATES.includes(job.state);
   return (
@@ -101,13 +105,24 @@ function JobRow({
             Cancel
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={onRemove}
-            className="rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
-          >
-            Remove
-          </button>
+          <>
+            {job.state === 'completed' && (
+              <button
+                type="button"
+                onClick={onDownload}
+                className="rounded bg-indigo-600 px-2 py-0.5 text-xs font-medium text-white hover:bg-indigo-500"
+              >
+                Download
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onRemove}
+              className="rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-100 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800"
+            >
+              Remove
+            </button>
+          </>
         )}
       </div>
     </li>

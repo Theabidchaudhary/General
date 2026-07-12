@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useAppStore, VIEWS } from './store';
 import { DashboardView } from './views/DashboardView';
+import { DownloadsView } from './views/DownloadsView';
 import { JobsView } from './views/JobsView';
 import { PlaceholderView } from './views/PlaceholderView';
 import { PromptsView } from './views/PromptsView';
@@ -61,13 +62,7 @@ export function App() {
         {activeView === 'dashboard' && <DashboardView />}
         {activeView === 'jobs' && <JobsView />}
         {activeView === 'prompts' && <PromptsView />}
-        {activeView === 'downloads' && (
-          <PlaceholderView
-            title="Downloads"
-            milestone="Milestone 7"
-            description="Automatic artifact downloads with progress and retry."
-          />
-        )}
+        {activeView === 'downloads' && <DownloadsView />}
         {activeView === 'history' && (
           <PlaceholderView
             title="History"

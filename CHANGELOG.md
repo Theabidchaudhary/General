@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased — Download Manager
+
+### Added
+
+- `src/downloads/`: `DownloadManager` turns a completed job's outputs into tracked, retryable downloads via a provider-adapter-style `DownloadDriver` abstraction (`ChromeDownloadDriver` for the real extension, `MockDownloadDriver` for tests). Tracks per-output `DownloadTask`s (queued → in_progress → completed/failed) with byte progress, persisted through a new `DownloadStore` (IndexedDB-backed in production). When every output of a job finishes downloading, the job transitions to `'downloaded'`.
+- Message bus: `downloads/list`, `downloads/start`, `downloads/retry`.
+- Side panel: completed jobs get a "Download" action in the Jobs view; the new Downloads view lists tasks with state, byte progress, and a "Retry" action for failures.
+- `autoDownload` support (off by default, matching `DEFAULT_SETTINGS`) — downloads every job automatically the moment it completes, for when the Settings module exposes the toggle.
+- 13 new tests (78 total). Verified the create-job → download → Downloads-view flow end to end in a headless browser against a mocked background worker.
+
+### Fixed
+
+- Two ordering bugs surfaced while stabilizing the new tests, both the same underlying mistake — code assuming a caller has "caught up" to an async operation before an event fires:
+  - `DownloadManager` chained the job's `'downloaded'` transition via `.then()` *after* persisting/emitting the download task's own `'completed'` update, so a listener reacting to that event could observe the job still `'completed'` instead of `'downloaded'`. Reordered so the job-level side effect happens first.
+  - `MockDownloadDriver` scheduled its progress/completion events with `queueMicrotask`, which can fire before the caller's `await driver.start(...)` continuation runs (i.e. before it has recorded the returned handle) — silently dropping the event, and stalling `DownloadManager` in the same way. Switched to macrotask (`setTimeout(0)`) scheduling, matching the fix applied to the queue engine's retry-wakeup timer earlier.
+
 ## Unreleased — Batch Engine
 
 ### Added
