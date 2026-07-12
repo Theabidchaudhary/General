@@ -4,10 +4,11 @@
  * an entry here; both ends get compile-time checking from the same map.
  */
 
-import type { DownloadTask, Job, JobRequest, PromptTemplate, QueueItem } from '@/types/models';
+import type { DownloadTask, HistoryRecord, Job, JobRequest, PromptTemplate, QueueItem } from '@/types/models';
 import type { ProviderDescriptor } from '@/providers/types';
 import type { SaveTemplateInput } from '@/prompts/library';
 import type { BatchInput, BatchResult } from '@/queue/batch';
+import type { HistoryQuery } from '@/history/service';
 import type { LogEntry } from '@/utils/logger';
 
 export interface MessageMap {
@@ -78,6 +79,10 @@ export interface MessageMap {
   'downloads/retry': {
     request: { taskId: string };
     response: { task: DownloadTask | undefined };
+  };
+  'history/list': {
+    request: { query?: HistoryQuery };
+    response: { records: HistoryRecord[] };
   };
   'logs/recent': {
     request: { limit?: number };

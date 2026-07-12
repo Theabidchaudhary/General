@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useAppStore, VIEWS } from './store';
 import { DashboardView } from './views/DashboardView';
 import { DownloadsView } from './views/DownloadsView';
+import { HistoryView } from './views/HistoryView';
 import { JobsView } from './views/JobsView';
 import { PlaceholderView } from './views/PlaceholderView';
 import { PromptsView } from './views/PromptsView';
@@ -63,13 +64,7 @@ export function App() {
         {activeView === 'jobs' && <JobsView />}
         {activeView === 'prompts' && <PromptsView />}
         {activeView === 'downloads' && <DownloadsView />}
-        {activeView === 'history' && (
-          <PlaceholderView
-            title="History"
-            milestone="Milestone 8"
-            description="Searchable archive of finished jobs and their outputs."
-          />
-        )}
+        {activeView === 'history' && <HistoryView />}
         {activeView === 'analytics' && (
           <PlaceholderView
             title="Analytics"

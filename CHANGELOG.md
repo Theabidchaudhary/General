@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — History
+
+### Added
+
+- `src/history/service.ts`: `HistoryService` archives every job that reaches a terminal state (completed/failed/downloaded) into a persisted, searchable `HistoryRecord`. Updates the same record in place if a job later moves completed → downloaded, rather than duplicating it.
+- New `HistoryStore` (memory + IndexedDB), added to the shared database.
+- Message bus: `history/list` (text/provider/final-state query).
+- Side panel: History view with search, state filter chips, and duration/timestamp display.
+- 9 new tests (87 total).
+
 ## Unreleased — Download Manager
 
 ### Added

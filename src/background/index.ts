@@ -7,6 +7,7 @@
 
 import { ChromeDownloadDriver } from '@/downloads/chromeDriver';
 import { DownloadManager } from '@/downloads/manager';
+import { HistoryService } from '@/history/service';
 import { PromptLibrary } from '@/prompts/library';
 import { MockProvider } from '@/providers/mock/mockProvider';
 import { ProviderRegistry } from '@/providers/registry';
@@ -14,6 +15,7 @@ import { BatchEngine } from '@/queue/batch';
 import { QueueEngine } from '@/queue/engine';
 import { createMessageRouter } from '@/services/messaging/bus';
 import { IndexedDbDownloadStore } from '@/services/storage/indexedDbDownloadStore';
+import { IndexedDbHistoryStore } from '@/services/storage/indexedDbHistoryStore';
 import { IndexedDbJobStore } from '@/services/storage/indexedDbJobStore';
 import { IndexedDbTemplateStore } from '@/services/storage/indexedDbTemplateStore';
 import { DEFAULT_SETTINGS } from '@/types/models';
@@ -44,11 +46,16 @@ const downloadManager = new DownloadManager({
   autoDownload: DEFAULT_SETTINGS.autoDownload,
 });
 
+const historyService = new HistoryService(queue, new IndexedDbHistoryStore(), log.child('history'));
+
 const ready = queue.restore().catch((error) => {
   log.error('Failed to restore queue from storage', error);
 });
 const downloadsReady = downloadManager.restore().catch((error) => {
   log.error('Failed to restore downloads from storage', error);
+});
+const historyReady = historyService.restore().catch((error) => {
+  log.error('Failed to restore history from storage', error);
 });
 
 createMessageRouter({
@@ -102,6 +109,10 @@ createMessageRouter({
   'downloads/retry': async ({ taskId }) => {
     await downloadsReady;
     return { task: await downloadManager.retry(taskId) };
+  },
+  'history/list': async ({ query }) => {
+    await historyReady;
+    return { records: historyService.list(query) };
   },
   'logs/recent': async ({ limit }) => ({ entries: getRecentLogs(limit) }),
 });

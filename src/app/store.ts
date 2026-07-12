@@ -8,10 +8,11 @@
  */
 
 import { create } from 'zustand';
-import type { DownloadTask, Job, JobRequest, PromptTemplate } from '@/types/models';
+import type { DownloadTask, HistoryRecord, Job, JobRequest, PromptTemplate } from '@/types/models';
 import type { ProviderDescriptor } from '@/providers/types';
 import type { SaveTemplateInput } from '@/prompts/library';
 import type { BatchInput, BatchResult } from '@/queue/batch';
+import type { HistoryQuery } from '@/history/service';
 import { MessageBusError, sendMessage } from '@/services/messaging/bus';
 
 export type ViewId =
@@ -42,9 +43,12 @@ interface AppState {
   providers: ProviderDescriptor[];
   templates: PromptTemplate[];
   downloadTasks: DownloadTask[];
+  historyRecords: HistoryRecord[];
+  historyQuery: HistoryQuery;
   lastError: string | undefined;
 
   setActiveView(view: ViewId): void;
+  setHistoryQuery(query: HistoryQuery): Promise<void>;
   refresh(): Promise<void>;
   enqueue(request: JobRequest, priority?: number): Promise<void>;
   pauseQueue(): Promise<void>;
@@ -81,17 +85,25 @@ export const useAppStore = create<AppState>((set, get) => {
     providers: [],
     templates: [],
     downloadTasks: [],
+    historyRecords: [],
+    historyQuery: {},
     lastError: undefined,
 
     setActiveView: (view) => set({ activeView: view }),
 
+    setHistoryQuery: (query) => {
+      set({ historyQuery: query });
+      return get().refresh();
+    },
+
     refresh: () =>
       guarded(async () => {
-        const [queueState, providerState, promptState, downloadState] = await Promise.all([
+        const [queueState, providerState, promptState, downloadState, historyState] = await Promise.all([
           sendMessage('queue/list', {}),
           sendMessage('providers/list', {}),
           sendMessage('prompts/list', {}),
           sendMessage('downloads/list', {}),
+          sendMessage('history/list', { query: get().historyQuery }),
         ]);
         set({
           jobs: queueState.jobs,
@@ -100,6 +112,7 @@ export const useAppStore = create<AppState>((set, get) => {
           providers: providerState.providers,
           templates: promptState.templates,
           downloadTasks: downloadState.tasks,
+          historyRecords: historyState.records,
         });
       }),
 
