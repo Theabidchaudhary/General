@@ -12,6 +12,7 @@ import type {
   JobRequest,
   PromptTemplate,
   QueueItem,
+  UserSettings,
 } from '@/types/models';
 import type { ProviderDescriptor } from '@/providers/types';
 import type { SaveTemplateInput } from '@/prompts/library';
@@ -95,6 +96,14 @@ export interface MessageMap {
   'analytics/snapshot': {
     request: Record<string, never>;
     response: { snapshot: AnalyticsSnapshot };
+  };
+  'settings/get': {
+    request: Record<string, never>;
+    response: { settings: UserSettings };
+  };
+  'settings/update': {
+    request: { patch: Partial<UserSettings> };
+    response: { settings: UserSettings };
   };
   'logs/recent': {
     request: { limit?: number };

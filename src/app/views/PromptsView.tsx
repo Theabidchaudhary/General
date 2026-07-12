@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { MediaKind, PromptTemplate } from '@/types/models';
 import { expandTemplate, extractVariables, MissingVariableError } from '@/prompts/variables';
 import { MAX_BATCH_SIZE } from '@/queue/batch';
+import { pickDefaultProvider } from '../providerSelection';
 import { useAppStore } from '../store';
 
 interface FormState {
@@ -18,6 +19,7 @@ const EMPTY_FORM: FormState = { id: undefined, name: '', body: '', kind: 'image'
 export function PromptsView() {
   const templates = useAppStore((s) => s.templates);
   const providers = useAppStore((s) => s.providers);
+  const defaultProviderId = useAppStore((s) => s.settings.defaultProviderId);
   const saveTemplate = useAppStore((s) => s.saveTemplate);
   const deleteTemplate = useAppStore((s) => s.deleteTemplate);
   const enqueue = useAppStore((s) => s.enqueue);
@@ -26,6 +28,7 @@ export function PromptsView() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [useTarget, setUseTarget] = useState<PromptTemplate | undefined>(undefined);
   const [batchTarget, setBatchTarget] = useState<PromptTemplate | undefined>(undefined);
+  const defaultProvider = pickDefaultProvider(providers, defaultProviderId);
 
   const liveVariables = extractVariables(form.body);
 
@@ -192,13 +195,12 @@ export function PromptsView() {
       {useTarget && (
         <UseTemplateDialog
           template={useTarget}
-          providerId={providers[0]?.id}
+          providerId={defaultProvider?.id}
           onClose={() => setUseTarget(undefined)}
           onEnqueue={(prompt) => {
-            const providerId = providers[0]?.id;
-            if (!providerId) return;
+            if (!defaultProvider) return;
             void enqueue({
-              providerId,
+              providerId: defaultProvider.id,
               kind: useTarget.kind,
               prompt,
               params: {},
@@ -212,7 +214,7 @@ export function PromptsView() {
       {batchTarget && (
         <BatchDialog
           template={batchTarget}
-          providerId={providers[0]?.id}
+          providerId={defaultProvider?.id}
           onClose={() => setBatchTarget(undefined)}
         />
       )}

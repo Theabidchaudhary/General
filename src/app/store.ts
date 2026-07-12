@@ -8,7 +8,16 @@
  */
 
 import { create } from 'zustand';
-import type { AnalyticsSnapshot, DownloadTask, HistoryRecord, Job, JobRequest, PromptTemplate } from '@/types/models';
+import type {
+  AnalyticsSnapshot,
+  DownloadTask,
+  HistoryRecord,
+  Job,
+  JobRequest,
+  PromptTemplate,
+  UserSettings,
+} from '@/types/models';
+import { DEFAULT_SETTINGS } from '@/types/models';
 import type { ProviderDescriptor } from '@/providers/types';
 import type { SaveTemplateInput } from '@/prompts/library';
 import type { BatchInput, BatchResult } from '@/queue/batch';
@@ -46,6 +55,7 @@ interface AppState {
   historyRecords: HistoryRecord[];
   historyQuery: HistoryQuery;
   analytics: AnalyticsSnapshot | undefined;
+  settings: UserSettings;
   lastError: string | undefined;
 
   setActiveView(view: ViewId): void;
@@ -61,6 +71,7 @@ interface AppState {
   submitBatch(input: BatchInput): Promise<BatchResult | undefined>;
   downloadJob(jobId: string): Promise<void>;
   retryDownload(taskId: string): Promise<void>;
+  updateSettings(patch: Partial<UserSettings>): Promise<void>;
 }
 
 export const useAppStore = create<AppState>((set, get) => {
@@ -89,6 +100,7 @@ export const useAppStore = create<AppState>((set, get) => {
     historyRecords: [],
     historyQuery: {},
     analytics: undefined,
+    settings: DEFAULT_SETTINGS,
     lastError: undefined,
 
     setActiveView: (view) => set({ activeView: view }),
@@ -100,7 +112,7 @@ export const useAppStore = create<AppState>((set, get) => {
 
     refresh: () =>
       guarded(async () => {
-        const [queueState, providerState, promptState, downloadState, historyState, analyticsState] =
+        const [queueState, providerState, promptState, downloadState, historyState, analyticsState, settingsState] =
           await Promise.all([
             sendMessage('queue/list', {}),
             sendMessage('providers/list', {}),
@@ -108,6 +120,7 @@ export const useAppStore = create<AppState>((set, get) => {
             sendMessage('downloads/list', {}),
             sendMessage('history/list', { query: get().historyQuery }),
             sendMessage('analytics/snapshot', {}),
+            sendMessage('settings/get', {}),
           ]);
         set({
           jobs: queueState.jobs,
@@ -118,6 +131,7 @@ export const useAppStore = create<AppState>((set, get) => {
           downloadTasks: downloadState.tasks,
           historyRecords: historyState.records,
           analytics: analyticsState.snapshot,
+          settings: settingsState.settings,
         });
       }),
 
@@ -186,6 +200,12 @@ export const useAppStore = create<AppState>((set, get) => {
       guarded(async () => {
         await sendMessage('downloads/retry', { taskId });
         await get().refresh();
+      }),
+
+    updateSettings: (patch) =>
+      guarded(async () => {
+        const { settings } = await sendMessage('settings/update', { patch });
+        set({ settings });
       }),
   };
 });

@@ -137,6 +137,15 @@ export class QueueEngine {
     return this.#maxConcurrent;
   }
 
+  /** Default retry budget applied to jobs enqueued from now on; existing jobs keep theirs. */
+  setDefaultMaxAttempts(value: number): void {
+    this.#defaultMaxAttempts = Math.max(1, Math.floor(value));
+  }
+
+  get defaultMaxAttempts(): number {
+    return this.#defaultMaxAttempts;
+  }
+
   listJobs(): Job[] {
     return [...this.#jobs.values()]
       .sort((a, b) => b.createdAt - a.createdAt)

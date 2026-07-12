@@ -17,7 +17,7 @@ Status of each module against [SPECIFICATION.md](SPECIFICATION.md), plus the dec
 | History | ✅ Implemented | `HistoryService` archives every job that reaches a terminal state; search by text/provider/state |
 | Analytics | ✅ Implemented | `AnalyticsService` derives a snapshot from History on demand; local-only |
 | Scheduler | ⬜ Planned | Milestone 10; will move retry timers onto `chrome.alarms` |
-| Settings module | 🟨 Partial | Concurrency wired end to end; sync-storage settings pending |
+| Settings module | ✅ Implemented | `SettingsService` over `chrome.storage.sync`; theme, concurrency, retries, auto-download, subfolder, notifications, telemetry toggle, default provider — all wired live into the subsystems that consume them |
 | Notifications | ⬜ Planned | |
 | Import/export | ⬜ Planned | |
 
@@ -70,6 +70,14 @@ Status of each module against [SPECIFICATION.md](SPECIFICATION.md), plus the dec
 
 - `AnalyticsService.computeSnapshot()` derives an `AnalyticsSnapshot` on demand from History's records (through a minimal `HistorySource` interface, same narrow-dependency pattern as History's `JobEventSource`) — no separate persisted snapshot table; History is already the source of truth for finished-job data, so a fresh computation each time is simpler and can't drift out of sync with it.
 - UI breakdown bars (jobs by provider, jobs by kind) use a single sequential hue sized by magnitude, not a categorical palette — per the dataviz skill, categorical color is for *distinguishing identities*, and here identity is already carried by the row's text label; the count is a *magnitude* comparison, for which "one hue, more is darker/longer" is the correct default. Text (labels, values) always uses neutral text-token colors, never the bar's fill color.
+
+### Settings (`src/settings/`)
+
+- `SettingsService` merges persisted overrides with `DEFAULT_SETTINGS` (so a corrupted/partial stored object never leaves a field `undefined`), clamps `maxConcurrentJobs`/`maxAttempts` to `Math.max(1, Math.floor(value))` — deliberately matching `QueueEngine.setMaxConcurrent`'s own clamping exactly, so a value that round-trips through both never changes — and falls back to `DEFAULT_SETTINGS.theme` for anything outside the three valid theme values.
+- Persistence is `chrome.storage.sync` (`ChromeSyncSettingsStore`), not IndexedDB — the one store in this codebase that isn't behind `db.ts`, per the architecture's explicit "Chrome Storage Sync" pairing for user settings so they follow a signed-in user across machines. `MemorySettingsStore` covers tests.
+- `background/index.ts` applies settings to every consuming subsystem — `queue.setMaxConcurrent()`, `queue.setDefaultMaxAttempts()`, `downloadManager.setAutoDownload()`, `downloadManager.setSubfolder()` — both once on restore and again on every `settings-changed` event, so a change takes effect immediately without a worker restart.
+- Theme: `styles.css` redefines Tailwind's `dark:` variant against `[data-theme="dark"]` instead of the `prefers-color-scheme` media query (`@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));`), and `useTheme()` (`src/app/useTheme.ts`) always writes an explicit `data-theme` onto `<html>` — resolving `'system'` via `matchMedia` and staying subscribed to OS changes only while `'system'` is selected. This is what lets an explicit "dark" choice override the OS preference; without redefining the variant, `dark:` utilities would only ever follow the OS.
+- `defaultProviderId` is honored by `pickDefaultProvider()` (`src/app/providerSelection.ts`), used by both the Dashboard's quick-enqueue and the Prompt Library's Use/Batch dialogs, falling back to the first available provider if the configured default no longer exists.
 
 ### Messaging (`src/services/messaging/`)
 

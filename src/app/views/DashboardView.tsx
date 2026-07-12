@@ -1,3 +1,4 @@
+import { pickDefaultProvider } from '../providerSelection';
 import { useAppStore } from '../store';
 
 /** At-a-glance queue health plus quick enqueue of a test job. */
@@ -7,6 +8,7 @@ export function DashboardView() {
   const providers = useAppStore((s) => s.providers);
   const enqueue = useAppStore((s) => s.enqueue);
   const connected = useAppStore((s) => s.connected);
+  const defaultProviderId = useAppStore((s) => s.settings.defaultProviderId);
 
   const active = jobs.filter((j) =>
     ['pending', 'validating', 'running', 'waiting', 'retrying'].includes(j.state),
@@ -14,7 +16,7 @@ export function DashboardView() {
   const completed = jobs.filter((j) => j.state === 'completed' || j.state === 'downloaded').length;
   const failed = jobs.filter((j) => j.state === 'failed').length;
 
-  const defaultProvider = providers[0];
+  const defaultProvider = pickDefaultProvider(providers, defaultProviderId);
 
   return (
     <section aria-labelledby="dashboard-heading" className="space-y-4">

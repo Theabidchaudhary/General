@@ -19,7 +19,9 @@ import { IndexedDbDownloadStore } from '@/services/storage/indexedDbDownloadStor
 import { IndexedDbHistoryStore } from '@/services/storage/indexedDbHistoryStore';
 import { IndexedDbJobStore } from '@/services/storage/indexedDbJobStore';
 import { IndexedDbTemplateStore } from '@/services/storage/indexedDbTemplateStore';
-import { DEFAULT_SETTINGS } from '@/types/models';
+import { ChromeSyncSettingsStore } from '@/settings/chromeSyncStore';
+import { SettingsService } from '@/settings/service';
+import { DEFAULT_SETTINGS, type UserSettings } from '@/types/models';
 import { createLogger, getRecentLogs } from '@/utils/logger';
 
 const log = createLogger('background');
@@ -50,6 +52,16 @@ const downloadManager = new DownloadManager({
 const historyService = new HistoryService(queue, new IndexedDbHistoryStore(), log.child('history'));
 const analyticsService = new AnalyticsService(historyService);
 
+const settingsService = new SettingsService(new ChromeSyncSettingsStore());
+
+function applySettings(settings: UserSettings): void {
+  queue.setMaxConcurrent(settings.maxConcurrentJobs);
+  queue.setDefaultMaxAttempts(settings.maxAttempts);
+  downloadManager.setAutoDownload(settings.autoDownload);
+  downloadManager.setSubfolder(settings.downloadSubfolder);
+}
+settingsService.events.on('settings-changed', applySettings);
+
 const ready = queue.restore().catch((error) => {
   log.error('Failed to restore queue from storage', error);
 });
@@ -59,6 +71,16 @@ const downloadsReady = downloadManager.restore().catch((error) => {
 const historyReady = historyService.restore().catch((error) => {
   log.error('Failed to restore history from storage', error);
 });
+const settingsReady = settingsService
+  .restore()
+  .then((settings) => {
+    applySettings(settings);
+    return settings;
+  })
+  .catch((error) => {
+    log.error('Failed to restore settings from storage', error);
+    return DEFAULT_SETTINGS;
+  });
 
 createMessageRouter({
   'queue/enqueue': async ({ request, priority }) => {
@@ -119,6 +141,14 @@ createMessageRouter({
   'analytics/snapshot': async () => {
     await historyReady;
     return { snapshot: analyticsService.computeSnapshot() };
+  },
+  'settings/get': async () => {
+    await settingsReady;
+    return { settings: settingsService.get() };
+  },
+  'settings/update': async ({ patch }) => {
+    await settingsReady;
+    return { settings: await settingsService.update(patch) };
   },
   'logs/recent': async ({ limit }) => ({ entries: getRecentLogs(limit) }),
 });

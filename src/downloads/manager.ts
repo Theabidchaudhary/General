@@ -80,6 +80,10 @@ export class DownloadManager {
     return this.#autoDownload;
   }
 
+  setSubfolder(subfolder: string | undefined): void {
+    this.#subfolder = subfolder;
+  }
+
   async restore(): Promise<void> {
     const persisted = await this.#store.getAll();
     for (const task of persisted) {

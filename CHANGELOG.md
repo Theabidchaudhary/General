@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased — Settings
+
+### Added
+
+- `src/settings/`: `SettingsService` over `chrome.storage.sync` (`ChromeSyncSettingsStore`; `MemorySettingsStore` for tests) — theme, default provider, max concurrent jobs, max retry attempts, auto-download, download subfolder, notifications toggle, telemetry toggle. Every change is applied live to the queue engine, download manager, and (in a future milestone) notifications — no worker restart required.
+- Theme support: an explicit light/dark choice now overrides the OS preference (previously `dark:` only ever followed `prefers-color-scheme`). `system` still tracks the OS live. Verified via headless browser that selecting "dark" flips the UI even when the OS/page reports light.
+- `pickDefaultProvider()`: Dashboard and Prompt Library now enqueue against the configured default provider (falling back to the first available) instead of always the first provider in the list.
+- Message bus: `settings/get`, `settings/update`.
+- Side panel: full Settings form for every field above.
+- Small additive API surface to make settings actually take effect: `QueueEngine.setDefaultMaxAttempts()`, `DownloadManager.setSubfolder()`.
+- 6 new tests (98 total).
+
 ## Unreleased — Analytics
 
 ### Added

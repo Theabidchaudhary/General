@@ -1,5 +1,14 @@
 @import 'tailwindcss';
 
+/*
+ * Theme is applied explicitly via data-theme on <html> (see App.tsx), not the
+ * OS media query alone, so the Settings "light"/"dark"/"system" choice can
+ * override it. "system" still resolves to a live OS-driven value — App.tsx
+ * just computes it in JS and writes the same attribute, so this is the only
+ * dark-mode switch either way.
+ */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
 :root {
   color-scheme: light dark;
 }

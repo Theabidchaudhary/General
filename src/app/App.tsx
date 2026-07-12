@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useAppStore, VIEWS } from './store';
+import { useTheme } from './useTheme';
 import { AnalyticsView } from './views/AnalyticsView';
 import { DashboardView } from './views/DashboardView';
 import { DownloadsView } from './views/DownloadsView';
@@ -15,6 +16,9 @@ export function App() {
   const setActiveView = useAppStore((s) => s.setActiveView);
   const connected = useAppStore((s) => s.connected);
   const refresh = useAppStore((s) => s.refresh);
+  const theme = useAppStore((s) => s.settings.theme);
+
+  useTheme(theme);
 
   useEffect(() => {
     void refresh();
