@@ -15,7 +15,7 @@ Status of each module against [SPECIFICATION.md](SPECIFICATION.md), plus the dec
 | Batch engine | ✅ Implemented | Fans a template + variable matrix into N queued jobs via `expandMatrix()`; capped at `MAX_BATCH_SIZE` (50) |
 | Downloads | ✅ Implemented | `DownloadManager` over a `DownloadDriver` abstraction (chrome.downloads / scriptable mock); progress, retry, auto-download opt-in |
 | History | ✅ Implemented | `HistoryService` archives every job that reaches a terminal state; search by text/provider/state |
-| Analytics | ⬜ Planned | Milestone 9; local-only |
+| Analytics | ✅ Implemented | `AnalyticsService` derives a snapshot from History on demand; local-only |
 | Scheduler | ⬜ Planned | Milestone 10; will move retry timers onto `chrome.alarms` |
 | Settings module | 🟨 Partial | Concurrency wired end to end; sync-storage settings pending |
 | Notifications | ⬜ Planned | |
@@ -65,6 +65,11 @@ Status of each module against [SPECIFICATION.md](SPECIFICATION.md), plus the dec
 - `HistoryService` subscribes to the same `job-updated` event stream as everything else, through a minimal `JobEventSource` interface (just `events`) rather than the `JobSource` interface downloads/manager.ts defines — History doesn't need `getJob`/`markDownloaded`, so it gets its own narrower dependency rather than reusing a bigger one.
 - One record per job, keyed internally by `jobId`: writing happens on the job's *first* terminal state (`completed`/`failed`/`downloaded`) and is updated in place (same `HistoryRecord.id`) if the job later moves `completed` → `downloaded`, so a downloaded job doesn't show up twice.
 - `list(query)` filters and sorts in memory (case-insensitive prompt substring, provider, final state; newest-finished first). No pagination yet — fine at the scale this module will see before a dedicated index/pagination pass is warranted.
+
+### Analytics (`src/analytics/`)
+
+- `AnalyticsService.computeSnapshot()` derives an `AnalyticsSnapshot` on demand from History's records (through a minimal `HistorySource` interface, same narrow-dependency pattern as History's `JobEventSource`) — no separate persisted snapshot table; History is already the source of truth for finished-job data, so a fresh computation each time is simpler and can't drift out of sync with it.
+- UI breakdown bars (jobs by provider, jobs by kind) use a single sequential hue sized by magnitude, not a categorical palette — per the dataviz skill, categorical color is for *distinguishing identities*, and here identity is already carried by the row's text label; the count is a *magnitude* comparison, for which "one hue, more is darker/longer" is the correct default. Text (labels, values) always uses neutral text-token colors, never the bar's fill color.
 
 ### Messaging (`src/services/messaging/`)
 

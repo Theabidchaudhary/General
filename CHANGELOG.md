@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased — Analytics
+
+### Added
+
+- `src/analytics/service.ts`: `AnalyticsService` computes an `AnalyticsSnapshot` (totals by final state, average duration, breakdown by provider and media kind) on demand from History records — no separate persisted snapshot store, so it can't drift out of sync with History.
+- Message bus: `analytics/snapshot`.
+- Side panel: Analytics view with a stat-tile KPI row and two magnitude bar breakdowns, following the dataviz skill's guidance (single sequential hue for magnitude comparisons, not a categorical palette; text never carries the data color).
+- 5 new tests (92 total).
+
 ## Unreleased — History
 
 ### Added

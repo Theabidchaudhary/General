@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 import { useAppStore, VIEWS } from './store';
+import { AnalyticsView } from './views/AnalyticsView';
 import { DashboardView } from './views/DashboardView';
 import { DownloadsView } from './views/DownloadsView';
 import { HistoryView } from './views/HistoryView';
 import { JobsView } from './views/JobsView';
-import { PlaceholderView } from './views/PlaceholderView';
 import { PromptsView } from './views/PromptsView';
 import { SettingsView } from './views/SettingsView';
 
@@ -65,13 +65,7 @@ export function App() {
         {activeView === 'prompts' && <PromptsView />}
         {activeView === 'downloads' && <DownloadsView />}
         {activeView === 'history' && <HistoryView />}
-        {activeView === 'analytics' && (
-          <PlaceholderView
-            title="Analytics"
-            milestone="Milestone 9"
-            description="Local-only usage insights: throughput, failure rates, provider mix."
-          />
-        )}
+        {activeView === 'analytics' && <AnalyticsView />}
         {activeView === 'settings' && <SettingsView />}
       </main>
     </div>

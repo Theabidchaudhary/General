@@ -4,7 +4,15 @@
  * an entry here; both ends get compile-time checking from the same map.
  */
 
-import type { DownloadTask, HistoryRecord, Job, JobRequest, PromptTemplate, QueueItem } from '@/types/models';
+import type {
+  AnalyticsSnapshot,
+  DownloadTask,
+  HistoryRecord,
+  Job,
+  JobRequest,
+  PromptTemplate,
+  QueueItem,
+} from '@/types/models';
 import type { ProviderDescriptor } from '@/providers/types';
 import type { SaveTemplateInput } from '@/prompts/library';
 import type { BatchInput, BatchResult } from '@/queue/batch';
@@ -83,6 +91,10 @@ export interface MessageMap {
   'history/list': {
     request: { query?: HistoryQuery };
     response: { records: HistoryRecord[] };
+  };
+  'analytics/snapshot': {
+    request: Record<string, never>;
+    response: { snapshot: AnalyticsSnapshot };
   };
   'logs/recent': {
     request: { limit?: number };

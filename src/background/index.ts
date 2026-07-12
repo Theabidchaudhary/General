@@ -5,6 +5,7 @@
  * message router, and opens the side panel from the toolbar action.
  */
 
+import { AnalyticsService } from '@/analytics/service';
 import { ChromeDownloadDriver } from '@/downloads/chromeDriver';
 import { DownloadManager } from '@/downloads/manager';
 import { HistoryService } from '@/history/service';
@@ -47,6 +48,7 @@ const downloadManager = new DownloadManager({
 });
 
 const historyService = new HistoryService(queue, new IndexedDbHistoryStore(), log.child('history'));
+const analyticsService = new AnalyticsService(historyService);
 
 const ready = queue.restore().catch((error) => {
   log.error('Failed to restore queue from storage', error);
@@ -113,6 +115,10 @@ createMessageRouter({
   'history/list': async ({ query }) => {
     await historyReady;
     return { records: historyService.list(query) };
+  },
+  'analytics/snapshot': async () => {
+    await historyReady;
+    return { snapshot: analyticsService.computeSnapshot() };
   },
   'logs/recent': async ({ limit }) => ({ entries: getRecentLogs(limit) }),
 });

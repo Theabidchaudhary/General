@@ -8,7 +8,7 @@
  */
 
 import { create } from 'zustand';
-import type { DownloadTask, HistoryRecord, Job, JobRequest, PromptTemplate } from '@/types/models';
+import type { AnalyticsSnapshot, DownloadTask, HistoryRecord, Job, JobRequest, PromptTemplate } from '@/types/models';
 import type { ProviderDescriptor } from '@/providers/types';
 import type { SaveTemplateInput } from '@/prompts/library';
 import type { BatchInput, BatchResult } from '@/queue/batch';
@@ -45,6 +45,7 @@ interface AppState {
   downloadTasks: DownloadTask[];
   historyRecords: HistoryRecord[];
   historyQuery: HistoryQuery;
+  analytics: AnalyticsSnapshot | undefined;
   lastError: string | undefined;
 
   setActiveView(view: ViewId): void;
@@ -87,6 +88,7 @@ export const useAppStore = create<AppState>((set, get) => {
     downloadTasks: [],
     historyRecords: [],
     historyQuery: {},
+    analytics: undefined,
     lastError: undefined,
 
     setActiveView: (view) => set({ activeView: view }),
@@ -98,13 +100,15 @@ export const useAppStore = create<AppState>((set, get) => {
 
     refresh: () =>
       guarded(async () => {
-        const [queueState, providerState, promptState, downloadState, historyState] = await Promise.all([
-          sendMessage('queue/list', {}),
-          sendMessage('providers/list', {}),
-          sendMessage('prompts/list', {}),
-          sendMessage('downloads/list', {}),
-          sendMessage('history/list', { query: get().historyQuery }),
-        ]);
+        const [queueState, providerState, promptState, downloadState, historyState, analyticsState] =
+          await Promise.all([
+            sendMessage('queue/list', {}),
+            sendMessage('providers/list', {}),
+            sendMessage('prompts/list', {}),
+            sendMessage('downloads/list', {}),
+            sendMessage('history/list', { query: get().historyQuery }),
+            sendMessage('analytics/snapshot', {}),
+          ]);
         set({
           jobs: queueState.jobs,
           paused: queueState.paused,
@@ -113,6 +117,7 @@ export const useAppStore = create<AppState>((set, get) => {
           templates: promptState.templates,
           downloadTasks: downloadState.tasks,
           historyRecords: historyState.records,
+          analytics: analyticsState.snapshot,
         });
       }),
 
